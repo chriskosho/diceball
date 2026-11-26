@@ -21,7 +21,7 @@ The visitors bat first. Each at-bat, the batter rolls two dice and the dice char
 - **Singles, doubles and triples** move every runner up one, two, or all the way home. A home run scores everyone.
 - **Walks and hit by pitch** move runners only when they are forced.
 - **Outs** never move runners. A double play is 2 outs and a triple play is 3.
-- **Battles:** when the batter rolls a good double (1-1, 4-4, 5-5 or 6-6), the batter and the defender each roll a die. Higher wins, ties roll again. If the batter wins, the result stands. If the defender wins, it is an out.
+- **Battles:** when the batter rolls a good double (1-1, 4-4, 5-5 or 6-6), the batter rolls a die, then the defending team rolls theirs. Higher wins, ties roll again. If the batter wins, the result stands. If the defender wins, it is an out.
 
 The full dice chart, with odds, is in the app (Menu, then Dice chart). It lives in one constant (`CHART`) at the top of the script, so it is easy to retune.
 

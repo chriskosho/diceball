@@ -95,7 +95,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
     T('extra innings: visitors lead after a full 10th wins', () => { const g = game({ inning: 10, half: 1, outs: 2, runs: [[2, 0, 0, 0, 0, 0, 0, 0, 0, 1], [2]] }); const ev = E.applyOutcome(g, 'K', false); return ev.over && g.winner === 0; });
     T('extra innings: home walk-off', () => { const g = game({ inning: 11, half: 1, bases: [1, 0, 0], runs: [[2], [2]] }); const ev = E.applyOutcome(g, 'HR', false); return ev.over && ev.walkoff && g.winner === 1; });
     T('shorter games use their own length', () => { const g = game({ innings: 3, inning: 3, half: 1, outs: 2, runs: [[1], [0]] }); const ev = E.applyOutcome(g, 'K', false); return ev.over && g.winner === 0; });
-    T('good doubles start a battle', () => { const g = game(); const ev = E.atBat(g, [4, 4]); return ev.battle && g.pending.id === 'BB' && g.outs === 0; });
+    T('good doubles start a battle', () => { const g = game(); const ev = E.atBat(g, [4, 4]); return ev.battle && g.pending.id === 'BB' && g.pending.b === null && g.outs === 0; });
     T('bad doubles do not', () => { const g = game(); const ev = E.atBat(g, [2, 2]); return !ev.battle && g.outs === 2; });
     T('only the four good doubles are battles', () => eq(E.BATTLE_KEYS, ['1-1', '4-4', '5-5', '6-6']));
     T('battle tie rolls again until broken', () => { const seq = [0.1, 0.1, 0.5, 0.5, 0.9, 0.2]; let i = 0; const r = E.battleRounds(() => seq[i++]); return eq(r, [[1, 1], [4, 4], [6, 2]]); });
@@ -134,7 +134,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 3. Computer against computer, through the interface, to the final out
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.motion', 'off'); localStorage.setItem('dd.seen', '1.0.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.motion', 'off'); localStorage.setItem('dd.seen', '1.1.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="0"][data-bot="1"]');
@@ -154,7 +154,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 4. A person's turns, with animations on, a battle and undo
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.0.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.1.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
@@ -171,12 +171,20 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
   await page.click('#undo');
   const after = await page.evaluate(() => JSON.stringify(__dd.state));
   check(before !== after, 'interface: undo changed nothing');
-  // Force a battle and roll it through the screen
-  await page.evaluate(() => { const s = __dd.state; s.pending = { key: '1-1', id: 'HR' }; s.outs = 0; s.bases = [0, 0, 0]; });
-  await page.click('#rollbtn');
-  await page.waitForFunction(() => !__dd.ui.busy && !__dd.state.pending, null, { timeout: 30000 });
+  // Force a battle: the batter rolls a die, then the defender rolls theirs (ties roll again)
+  await page.evaluate(() => { const s = __dd.state; s.pending = { key: '1-1', id: 'HR', b: null, rounds: [] }; s.outs = 0; s.bases = [0, 0, 0]; s.teams[0].bot = false; s.teams[1].bot = false; renderAll(); });
+  check((await page.innerText('#rollbtn')) === 'Batter: roll your die', 'battle: first button should be the batter\'s die');
   const lab = await page.locator('.dlabel').allInnerTexts();
   check(lab.join('|') === 'Batter|Defender', 'battle: dice labels missing: ' + lab.join('|'));
+  await page.click('#rollbtn');
+  await page.waitForFunction(() => !__dd.ui.busy, null, { timeout: 15000 });
+  check((await page.innerText('#rollbtn')) === 'Defender: roll your die', 'battle: second button should be the defender\'s die');
+  check(await page.evaluate(() => __dd.state.pending.b >= 1 && __dd.state.log.length > 0), 'battle: batter die was not kept');
+  for (let i = 0; i < 40 && await page.evaluate(() => !!__dd.state.pending); i++) {
+    await page.click('#rollbtn');
+    await page.waitForFunction(() => !__dd.ui.busy, null, { timeout: 15000 });
+  }
+  check(await page.evaluate(() => !__dd.state.pending), 'battle: did not resolve');
   // Menu and chart open
   await page.click('#gear'); await page.waitForSelector('#menu[open]');
   await page.click('#m-chart'); await page.waitForSelector('#chartdlg[open]');
@@ -192,7 +200,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 5. Immersive 3D throw
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.roll', 'immersive'); localStorage.setItem('dd.seen', '1.0.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.roll', 'immersive'); localStorage.setItem('dd.seen', '1.1.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
@@ -206,13 +214,20 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
   // Cancel works
   await page.click('#rollbtn'); await page.waitForSelector('#throw.armed'); await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('#throw'));
+  // A battle throws one 3D die at a time
+  await page.evaluate(() => { const s = __dd.state; s.pending = { key: '1-1', id: 'HR', b: null, rounds: [] }; s.teams[0].bot = false; s.teams[1].bot = false; renderAll(); });
+  await page.click('#rollbtn'); await page.waitForSelector('#throw.armed');
+  check((await page.locator('#throw .tdie').count()) === 1, 'immersive battle: expected a single die');
+  await page.keyboard.press('Space');
+  await page.waitForFunction(() => !document.querySelector('#throw') && !__dd.ui.busy, null, { timeout: 15000 });
+  check(await page.evaluate(() => __dd.state.pending && __dd.state.pending.b >= 1), 'immersive battle: batter die was not kept');
   console.log('Immersive throw: picked up, thrown, and put down');
   await ctx.close();
 }
 
 // 6. Installable app: manifest, service worker, offline
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.0.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.1.0'); });
   await page.goto(url);
   const man = await (await page.request.get(url + 'manifest.webmanifest')).json();
   check(man.display === 'standalone' && man.icons.length >= 3, 'manifest incomplete');
@@ -230,13 +245,13 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 7. Updates: automatic reload that keeps the game, then What's new
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { if (!localStorage.getItem('dd.seen')) localStorage.setItem('dd.seen', '0.9.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { if (!localStorage.getItem('dd.seen')) localStorage.setItem('dd.seen', '1.0.0'); });
   let served = appVersion();
   await page.route('**/version.json*', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ version: served }) }));
   await page.goto(url);
   // A player from an older version sees What's new on opening
   await page.waitForSelector('#whatsnew[open]');
-  check(/First pitch/.test(await page.innerText('#wn-body')), "What's new did not list the release");
+  check(/Battles are rolled/.test(await page.innerText('#wn-body')), "What's new did not list the release");
   await page.click('#wn-close');
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
