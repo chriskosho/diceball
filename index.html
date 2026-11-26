@@ -187,8 +187,11 @@ input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(-
    entry (newest first). The deploy step publishes the number as version.json, and
    running copies check it to know when to update themselves.
    ===================================================================== */
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const RELEASES = [
+  {version:'1.1.0', date:'2026-11-26', title:'Battles are rolled by both players', changes:[
+    'In a Battle, the batter now rolls their own die, then the defending team rolls theirs. Ties roll again. The computer rolls for its own side.',
+    'The dice show Batter and Defender labels, and the Roll button says whose die is next.']},
   {version:'1.0.0', date:'2026-11-26', title:'First pitch', changes:[
     'Two teams, nine innings, one roll of two dice per at-bat. Play with a friend on one screen, or against the computer.',
     'Battles: when a good double comes up, the batter and the defender each roll a die to decide whether it counts.',
@@ -298,7 +301,7 @@ function atBat(s, dice){
   s.dice = [dice[0],dice[1]];
   const key = keyOf(dice), id = CHART[key];
   if(BATTLE_KEYS.includes(key)){
-    s.pending = {key, id};
+    s.pending = {key, id, b:null, rounds:[]};
     logLine(s, `${halfTag(s)} ${s.teams[s.half].name}: ${dice[0]}:${dice[1]} ${OUTCOMES[id].label}... Battle!`);
     return {battle:true, id, label:OUTCOMES[id].label};
   }
@@ -404,7 +407,7 @@ const sfx = {
    SCREEN
    ===================================================================== */
 const PIPS = {1:['2/2'],2:['1/1','3/3'],3:['1/1','2/2','3/3'],4:['1/1','1/3','3/1','3/3'],5:['1/1','1/3','2/2','3/1','3/3'],6:['1/1','2/1','3/1','1/3','2/3','3/3']};
-const pips = v => PIPS[v].map(a=>`<i style="grid-area:${a}"></i>`).join('');
+const pips = v => !PIPS[v] ? '' : PIPS[v].map(a=>`<i style="grid-area:${a}"></i>`).join('');
 const batTeam = () => ui.state.teams[ui.state.half];
 
 function renderScore(){
@@ -429,24 +432,30 @@ function renderField(){
   $('#hud').innerHTML = s.over ? '<b>Final</b>' : `<b>${s.half===0?'Top':'Bottom'} ${ordinal(s.inning)}</b><span>${esc(batTeam().name)} batting</span>`;
   $('#outs').innerHTML = `Outs ${[0,1,2].map(i=>`<i class="${i<s.outs?'on':''}"></i>`).join('')}`;
 }
-function actorIsBot(){ const s = ui.state; return !s.over && batTeam().bot; }
+/* Who rolls next. In a battle the batter rolls first, then the defending team rolls. */
+function actorIdx(){ const s = ui.state, p = s.pending; return p && p.b!=null ? 1-s.half : s.half; }
+function actorIsBot(){ const s = ui.state; return !s.over && s.teams[actorIdx()].bot; }
 function renderPanel(){
   const s = ui.state, t = batTeam();
   $('#who').textContent = s.over ? `${s.teams[s.winner].name} win` : `${t.name} at bat`;
   $('#who').style.color = s.over ? teamColor(s.winner) : teamColor(s.half);
-  $('#status').textContent = s.over ? (s.walkoff ? 'Walk-off!' : 'Game over') : s.pending ? 'A close one. The defender steps in.' : (t.bot ? 'Computer is up…' : 'Roll the dice to bat.');
+  const actor = s.teams[actorIdx()];
+  $('#status').textContent = s.over ? (s.walkoff ? 'Walk-off!' : 'Game over')
+    : s.pending ? (s.pending.b==null ? `Battle! ${actor.name}: roll the batter’s die.` : `Battle! ${actor.name}: roll the defender’s die.`)
+    : (t.bot ? 'Computer is up…' : 'Roll the dice to bat.');
   // Dice show the last roll. They are kept while a roll is running.
   if(!ui.busy){
-    const lab = ui.labels || ['',''];
-    $('#dice').innerHTML = [0,1].map(k=>`<div class="dicewrap"><span class="die" aria-label="Die showing ${s.dice[k]}">${pips(s.dice[k])}</span><span class="dlabel">${lab[k]}</span></div>`).join('');
+    const lab = s.pending ? ['Batter','Defender'] : (ui.labels || ['','']);
+    const vals = s.pending ? [s.pending.b, null] : s.dice;
+    $('#dice').innerHTML = [0,1].map(k=>`<div class="dicewrap"><span class="die" aria-label="${vals[k]==null ? 'Die not rolled yet' : 'Die showing '+vals[k]}">${pips(vals[k])}</span><span class="dlabel">${lab[k]}</span></div>`).join('');
   }
   const r = ui.result, box = $('#result');
   box.className = 'result' + (r ? ' '+r.tone : '');
   box.innerHTML = r ? `<b>${esc(r.title)}</b><span>${esc(r.sub||'')}</span>` : '<span>&nbsp;</span>';
   const btn = $('#rollbtn');
-  btn.textContent = s.pending ? 'Roll the battle' : 'Roll dice';
+  btn.textContent = s.pending ? (s.pending.b==null ? 'Batter: roll your die' : 'Defender: roll your die') : 'Roll dice';
   btn.hidden = s.over;
-  btn.disabled = ui.busy || t.bot || dialogOpen();
+  btn.disabled = ui.busy || actorIsBot() || dialogOpen();
   $('#undo').disabled = ui.busy || !ui.hist.length;
 }
 function renderLog(){
@@ -458,11 +467,11 @@ function renderAll(){ renderScore(); renderField(); renderPanel(); renderLog(); 
 /* =====================================================================
    DICE ANIMATION (the same tossed and Immersive 3D rolls as Propertyopoly)
    ===================================================================== */
-async function animateDice(vals, fast){
-  const dice = $$('#dice .die');
+async function animateDice(vals, fast, idx){
+  let dice = $$('#dice .die'); if(idx!=null) dice = dice.slice(idx, idx+1);
   const show = () => dice.forEach((d,k)=>{ d.innerHTML = pips(vals[k]); d.setAttribute('aria-label', `Die showing ${vals[k]}`); });
   sfx.play('dice');
-  if(fast || reducedMotion() || dice.length!==2 || !dice[0].animate){ show(); await sleep(reducedMotion()?60:0); return; }
+  if(fast || reducedMotion() || dice.length!==vals.length || !dice[0].animate){ show(); await sleep(reducedMotion()?60:0); return; }
   if(ui.rollStyle==='immersive'){ await throwDiceImmersive(vals, show); await sleep(100); return; }
   const W = $('#dice').parentElement.clientWidth || 360, dur = 820;
   const anims = dice.map((d,k)=>{
@@ -511,18 +520,18 @@ function newThrowLayer(){
   return layer;
 }
 /* Pick up the dice. They hover, follow a finger or the mouse, and wait to be thrown. */
-function armRoll(action){
+function armRoll(action, n=2){
   const size = dieSize(), vw = innerWidth, vh = innerHeight, layer = newThrowLayer();
   layer.classList.add('armed'); layer.setAttribute('role','dialog'); layer.setAttribute('aria-label','Throw the dice');
   const touch = matchMedia('(pointer:coarse)').matches;
   layer.innerHTML = `<p class="throw-tip">${touch ? 'Flick or tap to throw the dice.' : 'Flick or click to throw the dice. Space throws too.'}</p><button class="btn small throw-cancel" type="button">Put them down</button>`;
   const H = ui.held = {layer, size, action, thrown:false, grab:null,
-    ds:[0,1].map(k=>newDie(layer, size, vw/2+(k?0.65:-0.65)*size, vh*0.5))};
+    ds:Array.from({length:n}, (_,k)=>newDie(layer, size, vw/2+(n===1?0:(k?0.65:-0.65)*size), vh*0.5))};
   H.ds.forEach(d=>placeDie(d, size));
   const hold = now => {
     if(ui.held!==H || H.thrown) return;
     H.ds.forEach((d,k)=>{
-      const tx = (H.grab ? H.grab.x : vw/2) + (k?0.65:-0.65)*size, ty = (H.grab ? H.grab.y-size*0.3 : vh*0.5) + Math.sin(now/260+k*1.9)*6;
+      const tx = (H.grab ? H.grab.x : vw/2) + (n===1?0:(k?0.65:-0.65)*size), ty = (H.grab ? H.grab.y-size*0.3 : vh*0.5) + Math.sin(now/260+k*1.9)*6;
       d.x += (tx-d.x)*0.35; d.y += (ty-d.y)*0.35;
       d.ay += k?1.4:-1.1; d.ax = 15+Math.sin(now/420+k)*20; d.h = 0.45+Math.sin(now/300+k)*0.08;
       placeDie(d, size);
@@ -572,7 +581,7 @@ function throwDiceImmersive(vals, show){
     const vw = innerWidth, vh = innerHeight, H = ui.held && ui.held.thrown ? ui.held : null;
     let layer, ds, size;
     if(H){ ({layer, ds, size} = H); layer.classList.remove('armed'); $$('.throw-tip,.throw-cancel', layer).forEach(e=>e.remove()); }
-    else { size = dieSize(); layer = newThrowLayer(); ds = [0,1].map(k=>newDie(layer, size, vw*(0.4+k*0.2), vh*0.84)); }
+    else { size = dieSize(); layer = newThrowLayer(); ds = vals.map((_,k)=>newDie(layer, size, vals.length===1 ? vw*0.5 : vw*(0.4+k*0.2), vh*0.84)); }
     layer.setAttribute('aria-hidden','true');
     const tv = ui.throwVel; ui.throwVel = null;
     const T = 1.75 + Math.random()*0.35;
@@ -604,8 +613,8 @@ function throwDiceImmersive(vals, show){
         d.az = P.az0 + (P.az1-P.az0)*ease + P.kick*(1-ease);
         d.h = Math.abs(Math.sin(t*5.2+0.3))*Math.exp(-1.8*t)*1.1*(1-u);
       }
-      const [A,B] = ds, dx = B.x-A.x, dy = B.y-A.y, dist = Math.hypot(dx,dy) || 1, gap = size*1.08;
-      if(dist<gap){ const nx = dx/dist, ny = dy/dist, push = (gap-dist)/2;
+      const [A,B] = ds.length===2 ? ds : [ds[0],ds[0]], dx = B.x-A.x, dy = B.y-A.y, dist = Math.hypot(dx,dy) || 1, gap = size*1.08;
+      if(ds.length===2 && dist<gap){ const nx = dx/dist, ny = dy/dist, push = (gap-dist)/2;
         A.x -= nx*push; A.y -= ny*push; B.x += nx*push; B.y += ny*push;
         const rel = (B.vx-A.vx)*nx + (B.vy-A.vy)*ny;
         if(rel<0){ A.vx += rel*nx; A.vy += rel*ny; B.vx -= rel*nx; B.vy -= rel*ny; kick(A, now); kick(B, now); thud(now, -rel*slow); } }
@@ -670,15 +679,21 @@ async function takeTurn(){
   ui.busy = true; ui.hist.push(JSON.stringify(s)); if(ui.hist.length>40) ui.hist.shift();
   clearBot(); renderPanel();
   if(s.pending){
-    ui.result = {title:'Battle!', sub:'Batter and defender each roll a die. Higher wins.', tone:'battle'}; renderPanel();
-    ui.labels = ['Batter','Defender']; $$('#dice .dlabel').forEach((e,k)=>e.textContent = ui.labels[k]);
-    const rounds = battleRounds(rng);
-    for(let i=0;i<rounds.length;i++){
-      await animateDice(rounds[i], false);
-      if(i<rounds.length-1){ ui.result = {title:'Tie!', sub:'Roll again', tone:'battle'}; box('#result', ui.result); await sleep(reducedMotion()?100:650); }
+    const p = s.pending, v = roll1(rng);
+    if(p.b==null){
+      await animateDice([v], false, 0);
+      p.b = v;
+      ui.result = {title:`Batter rolls a ${v}`, sub:`${s.teams[1-s.half].name}: your turn to defend.`, tone:'battle'};
+      ui.busy = false; autosave(); renderAll(); scheduleBot(); return;
     }
-    s.dice = rounds[rounds.length-1].slice();
-    const ev = resolveBattle(s, rounds);
+    await animateDice([v], false, 1);
+    if(v===p.b){
+      p.rounds.push([p.b, v]);
+      ui.result = {title:'Tie!', sub:'Both roll again.', tone:'battle'}; box('#result', ui.result);
+      await sleep(reducedMotion()?100:1000);
+      p.b = null; ui.busy = false; autosave(); renderAll(); scheduleBot(); return;
+    }
+    const ev = resolveBattle(s, [...p.rounds, [p.b, v]]);
     ui.result = describe(ev); sound(ev); if(ev.id==='HR' && !ev.robbed) homerBurst();
     afterPlay(ev);
   } else {
@@ -688,7 +703,7 @@ async function takeTurn(){
     await animateDice(dice, false);
     const ev = atBat(s, dice);
     if(ev.battle){
-      ui.result = {title:'Battle!', sub:`${dice[0]}:${dice[1]} would be a ${ev.label}. The defender gets a say.`, tone:'battle'}; sfx.play('battle');
+      ui.result = {title:'Battle!', sub:`${dice[0]}:${dice[1]} would be a ${ev.label}. The defender gets a say. Batter rolls first.`, tone:'battle'}; sfx.play('battle');
     } else { ui.result = describe(ev); sound(ev); if(ev.id==='HR') homerBurst(); }
     afterPlay(ev);
   }
@@ -702,7 +717,7 @@ function afterPlay(ev){
 }
 function onRoll(){
   if(ui.busy || ui.held || !ui.state || ui.state.over || dialogOpen() || actorIsBot()) return;
-  if(immersiveOn()) armRoll(()=>takeTurn());
+  if(immersiveOn()) armRoll(()=>takeTurn(), ui.state.pending ? 1 : 2);
   else takeTurn();
 }
 function clearBot(){ if(ui.botTimer){ clearTimeout(ui.botTimer); ui.botTimer = null; } }
