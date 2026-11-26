@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<!-- Diceball: an offline, turn-based baseball dice game. An original game; not affiliated with any league, team or publisher. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta name="theme-color" content="#F3EFE3">
+<script>try{var t=localStorage.getItem('dd.theme')==='dark'?'dark':'light';document.documentElement.dataset.theme=t;if(t==='dark')document.querySelector('meta[name=theme-color]').content='#0E1A13'}catch(e){document.documentElement.dataset.theme='light'}</script>
+<meta name="description" content="A turn-based baseball dice game for two teams on one screen. Works offline.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Diceball">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>Diceball: a baseball dice game</title>
+<style>
+:root{
+  --paper:#F3EFE3; --sheet:#FBF9F2; --ink:#17261D; --muted:#5A6B5F;
+  --line:#1F5E3B; --line-soft:rgba(31,94,59,.22);
+  --vis:#1C4E8A; --home:#C8402B; --roll:#0F7A5C; --good:#0F7A5C; --bad:#C8531F;
+  --cond:"Bahnschrift SemiCondensed","Bahnschrift","Avenir Next Condensed","DIN Condensed","DIN Alternate","Roboto Condensed","Arial Narrow",sans-serif-condensed,"Helvetica Neue",Arial,sans-serif;
+}
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --paper:#0E1A13; --sheet:#15261C; --ink:#EEF4EC; --muted:#A5B8A9;
+  --line:#9FD3B0; --line-soft:rgba(159,211,176,.25);
+  --vis:#6FA8E8; --home:#FF7A63; --roll:#1FA37C; --good:#4CCB9B; --bad:#FF9A5C;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+body{min-height:100dvh;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+button{font:inherit;color:inherit}
+.btn{font-family:var(--cond);font-stretch:condensed;font-size:1rem;padding:.58em 1.05em;border:1.5px solid var(--line);background:transparent;color:var(--ink);border-radius:6px;cursor:pointer;line-height:1.1;font-weight:600}
+.btn:hover:not(:disabled){background:var(--line-soft)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.small{font-size:.9rem;padding:.4em .7em}
+.btn.primary{background:var(--roll);border-color:var(--roll);color:#fff;font-weight:700}
+.btn.primary:hover:not(:disabled){background:var(--roll);filter:brightness(1.1)}
+.btn.danger{background:var(--home);border-color:var(--home);color:#fff}
+.btn[aria-pressed=true]{background:var(--line);color:var(--sheet)}
+.btn.ghost{border-color:transparent}
+#app{max-width:560px;margin:0 auto;padding:8px 10px 18px;display:flex;flex-direction:column;gap:10px}
+#app[hidden]{display:none}
+.bar{display:flex;align-items:center;gap:6px}
+.bar h1{font-family:var(--cond);font-stretch:condensed;font-size:1.5rem;margin:0;flex:1;letter-spacing:.01em}
+.bar .btn{min-width:42px;min-height:40px}
+/* scoreboard */
+.card{background:var(--sheet);border:2px solid var(--line);border-radius:10px;overflow:hidden}
+table.line{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;text-align:center}
+.line th,.line td{padding:6px 3px;font-size:.95rem;border-bottom:1px solid var(--line-soft)}
+.line thead th{font-family:var(--cond);font-weight:600;color:var(--muted);font-size:.8rem}
+.line tr:last-child td{border-bottom:0}
+.line td.nm,.line th.nm{text-align:left;padding-left:10px;font-family:var(--cond);font-stretch:condensed;font-weight:700;font-size:1.05rem;white-space:nowrap;max-width:9em;overflow:hidden;text-overflow:ellipsis}
+.line td.cur{background:var(--line-soft);font-weight:800}
+.line td.tot{font-weight:800;border-left:2px solid var(--line-soft);font-size:1.1rem}
+.sw{display:inline-block;width:.7em;height:.7em;border-radius:50%;margin-right:.45em;vertical-align:baseline}
+.line tr.batting td.nm::after{content:" ⚾";font-size:.8em}
+.line-wrap{overflow-x:auto}
+/* field */
+.fieldbox{position:relative;line-height:0}
+#field{width:100%;height:auto;display:block}
+.runner{transition:opacity .2s,transform .25s;transform-origin:center;transform-box:fill-box}
+.runner.off{opacity:0;transform:scale(.3)}
+.hud{position:absolute;left:8px;top:8px;line-height:1.2;font-family:var(--cond);font-stretch:condensed;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.hud b{font-size:1.5rem;display:block}
+.hud span{font-size:.95rem}
+.outs{position:absolute;right:10px;top:10px;display:flex;gap:6px;align-items:center;line-height:1;color:#fff;font-family:var(--cond);font-size:.95rem;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.outs i{width:16px;height:16px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.25);display:inline-block;transition:background .2s}
+.outs i.on{background:#E5382B;border-color:#fff}
+/* at-bat panel */
+.panel{padding:12px 14px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.who{font-family:var(--cond);font-stretch:condensed;font-weight:700;font-size:1.6rem;line-height:1}
+.status{margin:0;color:var(--muted);min-height:1.3em}
+.dicebox{position:relative}
+.dice{display:flex;gap:18px;justify-content:center;padding:6px 0}
+.dicewrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+.dlabel{font-family:var(--cond);font-size:.85rem;color:var(--muted);min-height:1.1em}
+.die{width:64px;height:64px;background:#fff;border:2px solid var(--line);border-radius:12px;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:9%;position:relative;will-change:transform}
+.die i{background:#13243D;border-radius:50%;margin:14%}
+.die.tossing{z-index:6}
+.result{min-height:4.3em;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.result b{font-family:var(--cond);font-stretch:condensed;font-size:2rem;line-height:1.05}
+.result span{color:var(--muted);font-size:.98rem}
+.result.good b{color:var(--good)} .result.bad b{color:var(--bad)} .result.battle b{color:var(--home)}
+.result.pop{animation:pop .25s ease-out}
+@keyframes pop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
+#rollbtn{font-size:1.35rem;padding:.7em 1.6em;min-width:12em}
+.log{max-height:11em;overflow:auto;padding:8px 12px;font-size:.9rem;line-height:1.45}
+.log div{border-bottom:1px solid var(--line-soft);padding:2px 0}
+.log[hidden]{display:none}
+/* dialogs */
+dialog{border:2px solid var(--line);background:var(--sheet);color:var(--ink);border-radius:10px;padding:0;width:min(520px,calc(100vw - 20px));max-height:calc(100dvh - 20px);box-shadow:0 10px 40px rgba(0,0,0,.35)}
+dialog::backdrop{background:rgba(5,20,12,.6)}
+dialog[open]{animation:pop .16s ease-out}
+.mb{padding:20px 22px 22px;overflow:auto;max-height:calc(100dvh - 24px)}
+dialog h2{font-family:var(--cond);font-stretch:condensed;font-size:1.8rem;margin:0 0 .3em;line-height:1;padding-right:30px}
+dialog h3{font-family:var(--cond);font-size:1.1rem;margin:1.1em 0 .4em;color:var(--line)}
+dialog p{line-height:1.5;margin:.4em 0}
+.row-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.hint{font-size:.88rem;color:var(--muted)}
+.xbtn{position:absolute;top:8px;right:8px;width:36px;height:36px;border:1.5px solid var(--line);background:var(--sheet);color:var(--line);font-size:24px;line-height:1;border-radius:6px;cursor:pointer;padding:0}
+.field-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end;margin:10px 0}
+.field-row label{display:flex;flex-direction:column;gap:4px;font-family:var(--cond);font-weight:600}
+input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);width:100%}
+.seg{display:flex;gap:6px}
+.chart{width:100%;border-collapse:collapse;font-size:.95rem}
+.chart td,.chart th{padding:4px 6px;border-bottom:1px solid var(--line-soft);text-align:left}
+.chart td.g{color:var(--good);font-weight:700} .chart td.b{color:var(--bad);font-weight:700}
+.chart .pp{display:inline-flex;gap:4px}
+.chart .mini{display:inline-block;width:1.5em;height:1.5em;line-height:1.4em;text-align:center;border:1.5px solid var(--ink);border-radius:4px;font-weight:700;font-size:.85rem}
+#whatsnew .rel{border-top:1px solid var(--line-soft);padding-top:4px;margin-top:14px}
+#whatsnew .rel:first-of-type{border-top:0}
+#whatsnew ul{margin:.3em 0;padding-left:1.2em} #whatsnew li{margin:.3em 0;line-height:1.45}
+#whatsnew .rel .meta{font-size:.85rem;color:var(--muted);margin:0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#13243D;color:#fff;padding:.6em 1em;border-radius:999px;z-index:3000;font-weight:600;max-width:calc(100vw - 24px);text-align:center}
+.motion-off *{animation:none!important;transition:none!important}
+/* immersive 3D throw */
+#throw{position:fixed;inset:0;z-index:2000;pointer-events:none;background:rgba(5,20,12,.45);overflow:hidden}
+#throw.armed{pointer-events:auto;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.tdie{position:absolute;left:0;top:0;perspective:700px;will-change:transform}
+.tdie .cube{position:absolute;inset:0;transform-style:preserve-3d;will-change:transform}
+.tdie .face{position:absolute;inset:0;box-sizing:border-box;background:#fff;border:1.5px solid #B9C6D2;border-radius:12%;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);backface-visibility:hidden;-webkit-backface-visibility:hidden;box-shadow:inset 0 0 14px rgba(19,36,61,.22)}
+.tdie .face i{width:76%;height:76%;border-radius:50%;background:#13243D;place-self:center}
+.tshadow{position:absolute;left:10%;top:10%;width:80%;height:80%;border-radius:20%;background:#000;filter:blur(9px)}
+.throw-tip{position:absolute;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100% - 32px);top:calc(64px + env(safe-area-inset-top));margin:0;padding:8px 14px;border-radius:999px;background:#13243D;text-align:center;color:#fff;font-weight:600;font-size:1rem;pointer-events:none}
+.throw-cancel,#throw .throw-cancel{position:absolute;top:calc(12px + env(safe-area-inset-top));right:12px;background:#fff;color:#13243D;border-color:#fff}
+.burst{position:absolute;left:50%;top:50%;width:230px;height:230px;margin:-115px 0 0 -115px;pointer-events:none;z-index:5;overflow:visible}
+.burst line{stroke:var(--home);stroke-width:4;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.confetti{position:fixed;z-index:2500;pointer-events:none;border-radius:2px}
+</style>
+</head>
+<body>
+<main id="app" hidden>
+  <div class="bar">
+    <h1>Diceball</h1>
+    <button class="btn small" id="undo" aria-label="Undo last roll" title="Undo (U)">↶ Undo</button>
+    <button class="btn small" id="fs" aria-label="Full screen" title="Full screen">⛶</button>
+    <button class="btn small" id="snd" aria-label="Sound on" title="Sound">🔊</button>
+    <button class="btn small" id="gear" aria-label="Menu" title="Menu">⚙</button>
+  </div>
+  <section class="card line-wrap" id="score" aria-label="Scoreboard"></section>
+  <section class="card fieldbox" aria-label="Field">
+    <svg id="field" viewBox="0 0 240 190" role="img" aria-label="Baseball diamond">
+      <rect width="240" height="190" fill="#3E8E57"/>
+      <g fill="#46995F"><rect x="0" y="0" width="240" height="24"/><rect x="0" y="48" width="240" height="24"/><rect x="0" y="96" width="240" height="24"/><rect x="0" y="144" width="240" height="24"/></g>
+      <polygon points="120,186 218,105 120,18 22,105" fill="#C9A06A"/>
+      <polygon points="120,150 160,105 120,62 80,105" fill="#3E8E57"/>
+      <polyline points="120,168 190,105 120,42 50,105 120,168" fill="none" stroke="#fff" stroke-width="2.2" opacity=".9"/>
+      <g fill="#fff" stroke="#8a6b3f" stroke-width="1">
+        <rect x="183" y="98" width="14" height="14" transform="rotate(45 190 105)"/>
+        <rect x="113" y="35" width="14" height="14" transform="rotate(45 120 42)"/>
+        <rect x="43" y="98" width="14" height="14" transform="rotate(45 50 105)"/>
+        <polygon points="120,160 128,166 125,174 115,174 112,166"/>
+      </g>
+      <circle class="runner off" id="r1" cx="190" cy="105" r="10" stroke="#fff" stroke-width="2.5"/>
+      <circle class="runner off" id="r2" cx="120" cy="42" r="10" stroke="#fff" stroke-width="2.5"/>
+      <circle class="runner off" id="r3" cx="50" cy="105" r="10" stroke="#fff" stroke-width="2.5"/>
+    </svg>
+    <div class="hud" id="hud"></div>
+    <div class="outs" id="outs"></div>
+  </section>
+  <section class="card panel" aria-label="At bat">
+    <div class="who" id="who"></div>
+    <p class="status" id="status"></p>
+    <div class="dicebox"><div class="dice" id="dice"></div></div>
+    <div class="result" id="result" aria-live="polite"></div>
+    <button class="btn primary" id="rollbtn">Roll dice</button>
+  </section>
+  <section class="card log" id="log" hidden aria-label="Game log"></section>
+</main>
+
+<dialog id="start"><div class="mb" id="start-body"></div></dialog>
+<dialog id="setup"><div class="mb" id="setup-body"></div></dialog>
+<dialog id="menu"><button class="xbtn" data-close aria-label="Close">×</button><div class="mb" id="menu-body"></div></dialog>
+<dialog id="chartdlg"><button class="xbtn" data-close aria-label="Close">×</button><div class="mb" id="chart-body"></div></dialog>
+<dialog id="over"><div class="mb" id="over-body"></div></dialog>
+<dialog id="confirm"><div class="mb" id="confirm-body"></div></dialog>
+<dialog id="whatsnew" aria-labelledby="wn-title"><div class="mb" id="wn-body"></div></dialog>
+
+<script>
+'use strict';
+/* =====================================================================
+   VERSIONS. Every release that reaches the site gets a new number and a RELEASES
+   entry (newest first). The deploy step publishes the number as version.json, and
+   running copies check it to know when to update themselves.
+   ===================================================================== */
+const APP_VERSION = '1.0.0';
+const RELEASES = [
+  {version:'1.0.0', date:'2026-11-26', title:'First pitch', changes:[
+    'Two teams, nine innings, one roll of two dice per at-bat. Play with a friend on one screen, or against the computer.',
+    'Battles: when a good double comes up, the batter and the defender each roll a die to decide whether it counts.',
+    'Choose Classic or Immersive dice rolling in the menu. Installable, works offline, and updates itself.']},
+];
+
+/* =====================================================================
+   ENGINE: the rules, with no screen code. Tests drive these directly.
+   ===================================================================== */
+const OUTCOMES = {
+  HR :{label:'Home Run',     kind:'hit',  good:true},
+  '3B':{label:'Triple',      kind:'hit',  good:true},
+  '2B':{label:'Double',      kind:'hit',  good:true},
+  '1B':{label:'Single',      kind:'hit',  good:true},
+  BB :{label:'Walk',         kind:'walk', good:true},
+  HBP:{label:'Hit By Pitch', kind:'walk', good:true},
+  FO :{label:'Fly Out',      kind:'out', outs:1},
+  PO :{label:'Pop Out',      kind:'out', outs:1},
+  GO :{label:'Ground Out',   kind:'out', outs:1},
+  K  :{label:'Strike Out',   kind:'out', outs:1},
+  DP :{label:'Double Play',  kind:'out', outs:2},
+  TP :{label:'Triple Play',  kind:'out', outs:3},
+};
+/* The dice chart: every unordered pair of two dice. Doubles come up 1 time in 36, other pairs 2 in 36. */
+const CHART = {
+  '1-1':'HR','1-2':'2B','1-3':'FO','1-4':'BB','1-5':'PO','1-6':'1B',
+  '2-2':'DP','2-3':'GO','2-4':'K','2-5':'1B','2-6':'K',
+  '3-3':'TP','3-4':'3B','3-5':'HBP','3-6':'FO',
+  '4-4':'BB','4-5':'PO','4-6':'K',
+  '5-5':'1B','5-6':'2B','6-6':'HR',
+};
+/* Doubles with a good result for the batter go to a Battle. */
+const BATTLE_KEYS = ['1-1','4-4','5-5','6-6'];
+const ROBBED = {HR:'Robbed Home Run', '1B':'Robbed Single', BB:'Struck out looking'};
+const ordinal = n => { const v = n%100, x = ['th','st','nd','rd']; return n+(x[(v-20)%10]||x[v]||x[0]); };
+const keyOf = d => d[0]<=d[1] ? d[0]+'-'+d[1] : d[1]+'-'+d[0];
+const roll1 = rng => 1+Math.floor(rng()*6);
+const roll2 = rng => [roll1(rng), roll1(rng)];
+
+function newGame(o={}){
+  const t = o.teams || [{name:'Visitors', bot:false},{name:'Home', bot:false}];
+  return {v:1, teams:t.map(x=>({name:String(x.name||'Team').slice(0,20), bot:!!x.bot})),
+    innings:o.innings||9, inning:1, half:0, outs:0, bases:[0,0,0], runs:[[],[]], hits:[0,0],
+    pending:null, over:false, winner:null, walkoff:false, homeSkipped:false, dice:[1,1], log:[]};
+}
+const teamRuns = (s,t) => s.runs[t].reduce((a,b)=>a+(b||0),0);
+const keyLabel = key => OUTCOMES[CHART[key]].label;
+
+function logLine(s, text){ s.log.push(text); if(s.log.length>300) s.log.shift(); }
+const halfTag = s => (s.half===0?'▲':'▼')+s.inning;
+
+function addRuns(s, n){
+  if(!n) return;
+  s.runs[s.half][s.inning-1] = (s.runs[s.half][s.inning-1]||0) + n;
+}
+function finish(s, winner, why){
+  s.over = true; s.winner = winner; s.pending = null; s.outs = Math.min(s.outs,3);
+  logLine(s, `Final: ${s.teams[0].name} ${teamRuns(s,0)}, ${s.teams[1].name} ${teamRuns(s,1)}.`);
+  if(why) s.walkoff = why==='walkoff';
+}
+/* Three outs: clear the bases, then decide whether the game is over or the sides switch. */
+function endHalf(s){
+  s.outs = 0; s.bases = [0,0,0];
+  const a = teamRuns(s,0), b = teamRuns(s,1);
+  if(s.half===0){
+    if(s.inning>=s.innings && b>a){ s.homeSkipped = true; finish(s, 1); return 'over'; }
+    s.half = 1;
+  } else {
+    if(s.inning>=s.innings && a!==b){ finish(s, a>b?0:1); return 'over'; }
+    s.inning++; s.half = 0;
+  }
+  return 'switch';
+}
+/* Apply one outcome for the team at bat. Returns what happened, for the screen to show. */
+function applyOutcome(s, id, robbed){
+  const o = OUTCOMES[id], t = s.half, b = s.bases, name = s.teams[t].name, tag = halfTag(s);
+  let runs = 0, outs = o.outs||0, n = [b[0],b[1],b[2]];
+  const on = b[0]+b[1]+b[2];
+  if(id==='HR'){ runs = on+1; n = [0,0,0]; }
+  else if(id==='3B'){ runs = on; n = [0,0,1]; }
+  else if(id==='2B'){ runs = b[1]+b[2]; n = [0,1,b[0]]; }
+  else if(id==='1B'){ runs = b[2]; n = [1,b[0],b[1]]; }
+  else if(o.kind==='walk'){
+    if(b[0]){ if(b[1]){ if(b[2]) runs = 1; n[2] = 1; } n[1] = 1; }
+    n[0] = 1;
+  }
+  const label = robbed ? (ROBBED[id]||'Robbed!') : o.label;
+  if(robbed){ outs = 1; runs = 0; n = [b[0],b[1],b[2]]; }
+  s.bases = n;
+  if(o.kind==='hit' && !robbed) s.hits[t]++;
+  addRuns(s, runs);
+  s.outs = Math.min(3, s.outs+outs);
+  logLine(s, `${tag} ${name}: ${label}${runs?`, ${runs} run${runs>1?'s':''} score`:''}${outs?` (${s.outs>=3?'3':s.outs} out${s.outs===1?'':'s'})`:''}.`);
+  const ev = {id, label, runs, outs, robbed:!!robbed, kind:robbed?'out':o.kind, halfEnded:false, over:false, walkoff:false};
+  // Walk-off: the home team takes the lead in the last inning or later and the game ends at once.
+  if(runs && t===1 && s.inning>=s.innings && teamRuns(s,1)>teamRuns(s,0)){
+    finish(s, 1, 'walkoff'); ev.over = true; ev.walkoff = true; return ev;
+  }
+  if(s.outs>=3){
+    ev.halfEnded = true; ev.endedTag = tag;
+    const r = endHalf(s); ev.over = r==='over';
+  }
+  return ev;
+}
+/* Roll the batter's two dice. Good doubles start a Battle; everything else happens right away. */
+function atBat(s, dice){
+  s.dice = [dice[0],dice[1]];
+  const key = keyOf(dice), id = CHART[key];
+  if(BATTLE_KEYS.includes(key)){
+    s.pending = {key, id};
+    logLine(s, `${halfTag(s)} ${s.teams[s.half].name}: ${dice[0]}:${dice[1]} ${OUTCOMES[id].label}... Battle!`);
+    return {battle:true, id, label:OUTCOMES[id].label};
+  }
+  return applyOutcome(s, id, false);
+}
+/* Battle rounds: batter and defender each roll one die; ties roll again. */
+function battleRounds(rng){
+  const rounds = [];
+  for(let i=0;i<200;i++){ const r = [roll1(rng), roll1(rng)]; rounds.push(r); if(r[0]!==r[1]) break; }
+  return rounds;
+}
+function resolveBattle(s, rounds){
+  const last = rounds[rounds.length-1];
+  const batterWins = last[0]>last[1];
+  const id = s.pending.id; s.pending = null; s.dice = [last[0], last[1]];
+  const ev = applyOutcome(s, id, !batterWins);
+  ev.battle = true; ev.batterWins = batterWins; ev.rounds = rounds.length;
+  return ev;
+}
+
+/* =====================================================================
+   SMALL HELPERS, STORAGE, STATE
+   ===================================================================== */
+const $ = (sel, el=document) => el.querySelector(sel);
+const $$ = (sel, el=document) => [...el.querySelectorAll(sel)];
+const esc = t => String(t).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(r=>setTimeout(r, ms));
+const LS = {
+  get(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} },
+};
+const KEY_AUTO='dd.auto', KEY_SETUP='dd.setup', KEY_THEME='dd.theme', KEY_MOTION='dd.motion', KEY_MUTE='dd.mute',
+      KEY_ROLL='dd.roll', KEY_LOG='dd.log', KEY_SEEN='dd.seen', KEY_RELOAD='dd.reload', KEY_RESUME='dd.resume';
+const PLACES = ['Austin','Dallas','Houston','San Antonio','El Paso','Fort Worth','Lubbock','Amarillo','Waco','Galveston','Tyler','Laredo',
+  'Boston','Chicago','Denver','Seattle','Phoenix','Atlanta','Miami','Detroit','Portland','Nashville','Memphis','Omaha','Oakland','Tampa','Cleveland','Brooklyn'];
+const ui = {
+  state:null, hist:[], busy:false, held:null, throwVel:null, result:null, labels:null, botTimer:null, installEvt:null,
+  theme: LS.get(KEY_THEME)==='dark' ? 'dark' : 'light',
+  motion: LS.get(KEY_MOTION)==='off' ? 'off' : 'on',
+  muted: LS.get(KEY_MUTE)==='1',
+  rollStyle: LS.get(KEY_ROLL)==='immersive' ? 'immersive' : 'classic',
+  showLog: LS.get(KEY_LOG)==='1',
+};
+const rng = () => Math.random();
+const reducedMotion = () => ui.motion==='off';
+const teamColor = t => t===0 ? 'var(--vis)' : 'var(--home)';
+const dialogOpen = () => $$('dialog').some(d=>d.open);
+function autosave(){ if(ui.state) LS.set(KEY_AUTO, JSON.stringify(ui.state)); }
+function validState(o){ return o && o.v===1 && Array.isArray(o.teams) && o.teams.length===2 && Array.isArray(o.runs) && Array.isArray(o.bases) && Array.isArray(o.log); }
+function toast(msg){
+  const t = document.createElement('div'); t.className='toast'; t.textContent = msg; t.setAttribute('role','status');
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 3200);
+}
+function applyTheme(){
+  document.documentElement.dataset.theme = ui.theme;
+  const m = document.querySelector('meta[name=theme-color]'); if(m) m.content = ui.theme==='dark' ? '#0E1A13' : '#F3EFE3';
+}
+function applyMotion(){ document.documentElement.classList.toggle('motion-off', ui.motion==='off'); }
+
+/* Sound effects, synthesized with the Web Audio API */
+const sfx = {
+  ctx:null,
+  ensure(){
+    if(!this.ctx){ try{ this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return null; } }
+    if(this.ctx.state==='suspended') this.ctx.resume();
+    return this.ctx;
+  },
+  tone(freq, dur, o={}){
+    const c = this.ensure(); if(!c || ui.muted) return;
+    const t = c.currentTime + (o.when||0), osc = c.createOscillator(), g = c.createGain();
+    osc.type = o.type||'sine'; osc.frequency.setValueAtTime(freq, t);
+    if(o.slide) osc.frequency.exponentialRampToValueAtTime(o.slide, t+dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(o.gain||0.12, t+0.01); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    osc.connect(g).connect(c.destination); osc.start(t); osc.stop(t+dur+0.05);
+  },
+  noise(dur, o={}){
+    const c = this.ensure(); if(!c || ui.muted) return;
+    const t = c.currentTime + (o.when||0), len = Math.max(1, Math.floor(c.sampleRate*dur));
+    const buf = c.createBuffer(1, len, c.sampleRate), data = buf.getChannelData(0);
+    for(let i=0;i<len;i++) data[i] = (Math.random()*2-1) * (1 - i/len);
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type='bandpass'; f.frequency.value = o.freq||2000; f.Q.value = o.q||1;
+    const g = c.createGain(); g.gain.value = o.gain||0.2;
+    src.connect(f).connect(g).connect(c.destination); src.start(t);
+  },
+  play(name){
+    if(ui.muted) return;
+    switch(name){
+      case 'dice': for(let k=0;k<6;k++) this.noise(0.035, {when:k*0.065+Math.random()*0.02, freq:1500+Math.random()*1500, q:3, gain:0.35}); break;
+      case 'thud': this.tone(95, 0.18, {gain:0.22, slide:48}); this.noise(0.07, {freq:300, q:1.5, gain:0.35}); break;
+      case 'hit': this.noise(0.05, {freq:1200, q:4, gain:0.6}); this.tone(660, 0.12, {gain:0.1}); this.tone(990, 0.2, {when:0.08, gain:0.1}); break;
+      case 'out': this.tone(300, 0.25, {type:'triangle', gain:0.1, slide:150}); break;
+      case 'walk': this.tone(520, 0.1, {type:'triangle', gain:0.1}); this.tone(700, 0.16, {when:0.09, type:'triangle', gain:0.1}); break;
+      case 'battle': [330,330,440].forEach((f,i)=>this.tone(f, 0.14, {when:i*0.12, type:'square', gain:0.05})); break;
+      case 'fanfare': [523,659,784,1047].forEach((f,i)=>this.tone(f, 0.22, {when:i*0.1, type:'triangle', gain:0.1})); [1047,1319,1568].forEach(f=>this.tone(f, 0.9, {when:0.45, type:'triangle', gain:0.07})); this.noise(0.5, {when:0.42, freq:6000, q:0.7, gain:0.08}); break;
+      case 'victory': [523,659,784,1047,1319].forEach((f,i)=>this.tone(f, 0.38, {when:i*0.13, type:'triangle', gain:0.1})); break;
+    }
+  },
+};
+
+/* =====================================================================
+   SCREEN
+   ===================================================================== */
+const PIPS = {1:['2/2'],2:['1/1','3/3'],3:['1/1','2/2','3/3'],4:['1/1','1/3','3/1','3/3'],5:['1/1','1/3','2/2','3/1','3/3'],6:['1/1','2/1','3/1','1/3','2/3','3/3']};
+const pips = v => PIPS[v].map(a=>`<i style="grid-area:${a}"></i>`).join('');
+const batTeam = () => ui.state.teams[ui.state.half];
+
+function renderScore(){
+  const s = ui.state, cols = Math.max(s.innings, s.inning);
+  const head = Array.from({length:cols}, (_,i)=>`<th>${i+1}</th>`).join('');
+  const row = t => {
+    const cells = Array.from({length:cols}, (_,i)=>{
+      const inn = i+1;
+      const played = inn<s.inning || (inn===s.inning && (t<=s.half || s.over));
+      const cur = !s.over && inn===s.inning && t===s.half;
+      let v = played ? String(s.runs[t][i]||0) : '';
+      if(t===1 && s.homeSkipped && inn===s.inning) v = 'X';
+      return `<td class="${cur?'cur':''}">${v}</td>`;
+    }).join('');
+    return `<tr class="${!s.over && s.half===t?'batting':''}"><td class="nm"><span class="sw" style="background:${teamColor(t)}"></span>${esc(s.teams[t].name)}</td>${cells}<td class="tot">${teamRuns(s,t)}</td><td class="tot" style="border-left:1px solid var(--line-soft)">${s.hits[t]}</td></tr>`;
+  };
+  $('#score').innerHTML = `<table class="line"><thead><tr><th class="nm"></th>${head}<th class="tot">R</th><th>H</th></tr></thead><tbody>${row(0)}${row(1)}</tbody></table>`;
+}
+function renderField(){
+  const s = ui.state;
+  [0,1,2].forEach(i=>{ const el = $('#r'+(i+1)); el.classList.toggle('off', !s.bases[i]); el.setAttribute('fill', s.half===0 ? '#1C4E8A' : '#C8402B'); });
+  $('#hud').innerHTML = s.over ? '<b>Final</b>' : `<b>${s.half===0?'Top':'Bottom'} ${ordinal(s.inning)}</b><span>${esc(batTeam().name)} batting</span>`;
+  $('#outs').innerHTML = `Outs ${[0,1,2].map(i=>`<i class="${i<s.outs?'on':''}"></i>`).join('')}`;
+}
+function actorIsBot(){ const s = ui.state; return !s.over && batTeam().bot; }
+function renderPanel(){
+  const s = ui.state, t = batTeam();
+  $('#who').textContent = s.over ? `${s.teams[s.winner].name} win` : `${t.name} at bat`;
+  $('#who').style.color = s.over ? teamColor(s.winner) : teamColor(s.half);
+  $('#status').textContent = s.over ? (s.walkoff ? 'Walk-off!' : 'Game over') : s.pending ? 'A close one. The defender steps in.' : (t.bot ? 'Computer is up…' : 'Roll the dice to bat.');
+  // Dice show the last roll. They are kept while a roll is running.
+  if(!ui.busy){
+    const lab = ui.labels || ['',''];
+    $('#dice').innerHTML = [0,1].map(k=>`<div class="dicewrap"><span class="die" aria-label="Die showing ${s.dice[k]}">${pips(s.dice[k])}</span><span class="dlabel">${lab[k]}</span></div>`).join('');
+  }
+  const r = ui.result, box = $('#result');
+  box.className = 'result' + (r ? ' '+r.tone : '');
+  box.innerHTML = r ? `<b>${esc(r.title)}</b><span>${esc(r.sub||'')}</span>` : '<span>&nbsp;</span>';
+  const btn = $('#rollbtn');
+  btn.textContent = s.pending ? 'Roll the battle' : 'Roll dice';
+  btn.hidden = s.over;
+  btn.disabled = ui.busy || t.bot || dialogOpen();
+  $('#undo').disabled = ui.busy || !ui.hist.length;
+}
+function renderLog(){
+  const el = $('#log'); el.hidden = !ui.showLog;
+  if(ui.showLog) el.innerHTML = ui.state.log.slice().reverse().map(l=>`<div>${esc(l)}</div>`).join('') || '<div>No plays yet.</div>';
+}
+function renderAll(){ renderScore(); renderField(); renderPanel(); renderLog(); $('#snd').setAttribute('aria-label', ui.muted ? 'Sound off' : 'Sound on'); $('#snd').textContent = ui.muted ? '🔇' : '🔊'; }
+
+/* =====================================================================
+   DICE ANIMATION (the same tossed and Immersive 3D rolls as Propertyopoly)
+   ===================================================================== */
+async function animateDice(vals, fast){
+  const dice = $$('#dice .die');
+  const show = () => dice.forEach((d,k)=>{ d.innerHTML = pips(vals[k]); d.setAttribute('aria-label', `Die showing ${vals[k]}`); });
+  sfx.play('dice');
+  if(fast || reducedMotion() || dice.length!==2 || !dice[0].animate){ show(); await sleep(reducedMotion()?60:0); return; }
+  if(ui.rollStyle==='immersive'){ await throwDiceImmersive(vals, show); await sleep(100); return; }
+  const W = $('#dice').parentElement.clientWidth || 360, dur = 820;
+  const anims = dice.map((d,k)=>{
+    d.classList.add('tossing');
+    const sx = -W*(0.42 + k*0.05), sy = -W*(0.11 - k*0.03), spin = k ? 620 : -700;
+    return d.animate([
+      {transform:`translate(${sx}px,${sy}px) rotate(${spin}deg) scale(.7)`, opacity:0, offset:0},
+      {opacity:1, offset:.12},
+      {transform:`translate(${W*0.015}px,0) rotate(${spin*0.06}deg) scale(1.04)`, offset:.55, easing:'cubic-bezier(.3,.6,.4,1)'},
+      {transform:`translate(${W*0.004}px,${-W*0.035}px) rotate(${-spin*0.02}deg)`, offset:.72, easing:'ease-in'},
+      {transform:'translate(0,0) rotate(0deg) scale(1,.94)', offset:.86, easing:'ease-out'},
+      {transform:'translate(0,0) rotate(0deg) scale(1)', offset:1},
+    ], {duration:dur, delay:k*70, easing:'linear', fill:'backwards'});
+  });
+  let landed = false;
+  setTimeout(()=>{ landed = true; show(); sfx.play('thud'); }, dur*0.55 + 30);
+  while(!landed){ dice.forEach(d=>d.innerHTML = pips(1+Math.floor(Math.random()*6))); await sleep(70); }
+  await Promise.all(anims.map(a=>a.finished.catch(()=>{})));
+  dice.forEach(d=>d.classList.remove('tossing'));
+  await sleep(100);
+}
+/* Immersive roll. Tapping Roll picks up two 3D dice; a flick or tap throws them across the whole
+   screen, where they bounce off the edges. The faces were already chosen: the tumble is only for show. */
+const immersiveOn = () => ui.rollStyle==='immersive' && !reducedMotion();
+const FACE_TURN = {1:[0,0], 2:[0,-90], 3:[-90,0], 4:[90,0], 5:[0,90], 6:[0,180]};
+const dieSize = () => Math.round(Math.max(64, Math.min(112, Math.min(innerWidth, innerHeight)*0.19)));
+function newDie(layer, size, x, y){
+  const el = document.createElement('div'); el.className = 'tdie'; el.style.width = el.style.height = size+'px';
+  const sides = [[1,'rotateY(0deg)'],[6,'rotateY(180deg)'],[2,'rotateY(90deg)'],[5,'rotateY(-90deg)'],[3,'rotateX(90deg)'],[4,'rotateX(-90deg)']];
+  el.innerHTML = `<div class="tshadow"></div><div class="cube">${sides.map(([v,tf])=>`<span class="face" style="transform:${tf} translateZ(${size/2}px);padding:${Math.round(size*0.12)}px">${pips(v)}</span>`).join('')}</div>`;
+  layer.appendChild(el);
+  return {el, cube:el.querySelector('.cube'), sh:el.querySelector('.tshadow'), x, y, vx:0, vy:0,
+    ax:Math.random()*360, ay:Math.random()*360, az:Math.random()*360, wx:0, wy:0, wz:0, h:0.5};
+}
+function placeDie(d, size){
+  const h = Math.max(0, d.h||0);
+  d.el.style.transform = `translate(${d.x-size/2}px,${d.y-size/2}px)`;
+  d.cube.style.transform = `scale(${1+0.3*h}) rotateZ(${d.az}deg) rotateX(${d.ax}deg) rotateY(${d.ay}deg)`;
+  d.sh.style.transform = `translate(${6+24*h}px,${10+30*h}px) scale(${1-0.15*h})`;
+  d.sh.style.opacity = String(0.5-0.25*h);
+}
+function newThrowLayer(){
+  const layer = document.createElement('div'); layer.id = 'throw';
+  document.body.appendChild(layer);
+  layer.animate([{opacity:0},{opacity:1}], {duration:140});
+  return layer;
+}
+/* Pick up the dice. They hover, follow a finger or the mouse, and wait to be thrown. */
+function armRoll(action){
+  const size = dieSize(), vw = innerWidth, vh = innerHeight, layer = newThrowLayer();
+  layer.classList.add('armed'); layer.setAttribute('role','dialog'); layer.setAttribute('aria-label','Throw the dice');
+  const touch = matchMedia('(pointer:coarse)').matches;
+  layer.innerHTML = `<p class="throw-tip">${touch ? 'Flick or tap to throw the dice.' : 'Flick or click to throw the dice. Space throws too.'}</p><button class="btn small throw-cancel" type="button">Put them down</button>`;
+  const H = ui.held = {layer, size, action, thrown:false, grab:null,
+    ds:[0,1].map(k=>newDie(layer, size, vw/2+(k?0.65:-0.65)*size, vh*0.5))};
+  H.ds.forEach(d=>placeDie(d, size));
+  const hold = now => {
+    if(ui.held!==H || H.thrown) return;
+    H.ds.forEach((d,k)=>{
+      const tx = (H.grab ? H.grab.x : vw/2) + (k?0.65:-0.65)*size, ty = (H.grab ? H.grab.y-size*0.3 : vh*0.5) + Math.sin(now/260+k*1.9)*6;
+      d.x += (tx-d.x)*0.35; d.y += (ty-d.y)*0.35;
+      d.ay += k?1.4:-1.1; d.ax = 15+Math.sin(now/420+k)*20; d.h = 0.45+Math.sin(now/300+k)*0.08;
+      placeDie(d, size);
+    });
+    requestAnimationFrame(hold);
+  };
+  requestAnimationFrame(hold);
+  let pts = [];
+  layer.addEventListener('pointerdown', e=>{
+    if(e.target.closest('.throw-cancel') || H.thrown) return;
+    pts = [[e.clientX, e.clientY, performance.now()]]; H.grab = {x:e.clientX, y:e.clientY};
+    try { layer.setPointerCapture(e.pointerId); } catch(_){}
+  });
+  layer.addEventListener('pointermove', e=>{
+    if(!pts.length) return;
+    pts.push([e.clientX, e.clientY, performance.now()]); if(pts.length>10) pts.shift();
+    H.grab = {x:e.clientX, y:e.clientY};
+  });
+  layer.addEventListener('pointerup', e=>{
+    if(!pts.length || H.thrown) return;
+    const now = performance.now(); pts.push([e.clientX, e.clientY, now]);
+    const p0 = pts.find(p=>now-p[2]<=140) || pts[0]; pts = [];
+    const dx = e.clientX-p0[0], dy = e.clientY-p0[1], dist = Math.hypot(dx,dy), dt = Math.max(16, now-p0[2]), speed = dist/dt*1000;
+    throwHeld(dist>30 && speed>400 ? {vx:dx/dist, vy:dy/dist, speed:speed*1.1} : null);
+  });
+  $('.throw-cancel', layer).addEventListener('click', e=>{ e.stopPropagation(); cancelHeld(); });
+}
+function throwHeld(vel){
+  const H = ui.held; if(!H || H.thrown) return;
+  H.thrown = true; ui.throwVel = vel;
+  Promise.resolve(H.action()).finally(()=>{ if(ui.held===H){ H.layer.remove(); ui.held = null; } });
+}
+function cancelHeld(){
+  const H = ui.held; if(!H || H.thrown) return;
+  ui.held = null;
+  H.layer.animate([{opacity:1},{opacity:0}], {duration:160}).finished.finally(()=>H.layer.remove());
+}
+/* While the dice are held, the keyboard throws or cancels and nothing else reacts. */
+document.addEventListener('keydown', e=>{
+  const H = ui.held; if(!H || H.thrown) return;
+  e.preventDefault(); e.stopImmediatePropagation();
+  if(e.key==='Escape') cancelHeld();
+  else if(e.key===' ' || e.key==='Enter' || e.key.toLowerCase()==='r') throwHeld(null);
+}, true);
+function throwDiceImmersive(vals, show){
+  return new Promise(done=>{
+    const vw = innerWidth, vh = innerHeight, H = ui.held && ui.held.thrown ? ui.held : null;
+    let layer, ds, size;
+    if(H){ ({layer, ds, size} = H); layer.classList.remove('armed'); $$('.throw-tip,.throw-cancel', layer).forEach(e=>e.remove()); }
+    else { size = dieSize(); layer = newThrowLayer(); ds = [0,1].map(k=>newDie(layer, size, vw*(0.4+k*0.2), vh*0.84)); }
+    layer.setAttribute('aria-hidden','true');
+    const tv = ui.throwVel; ui.throwVel = null;
+    const T = 1.75 + Math.random()*0.35;
+    const turn = () => (Math.random()<.5?-1:1)*(540+Math.random()*540);
+    ds.forEach((d,k)=>{
+      let sp = 1500+Math.random()*700, ang = -Math.PI/2 + (Math.random()-0.5)*0.9 + (k?0.18:-0.18);
+      if(tv){ sp = Math.min(2800, Math.max(1100, tv.speed)); ang = Math.atan2(tv.vy, tv.vx) + (k?0.14:-0.14); }
+      d.vx = Math.cos(ang)*sp; d.vy = Math.sin(ang)*sp;
+      const [fx,fy] = FACE_TURN[vals[k]], land = (from, face, by) => face + 360*Math.round((from+by-face)/360);
+      d.p = {ax0:d.ax, ay0:d.ay, az0:d.az, ax1:land(d.ax, fx, turn()), ay1:land(d.ay, fy, turn()), kick:0, kickT:0};
+      d.p.az1 = Math.round((d.az + turn()*0.5)/90)*90 + (Math.random()-.5)*24;
+    });
+    const edge = size*0.62, t0 = performance.now();
+    let last = t0, lastThud = 0;
+    const thud = (now, force) => { if(now-lastThud>90 && force>160){ lastThud = now; sfx.play('thud'); } };
+    const kick = (d, now) => { d.p.kick += (Math.random()-.5)*70; d.p.kickT = now; };
+    const step = now => {
+      const dt = Math.min(0.033, (now-last)/1000), t = (now-t0)/1000, u = Math.min(1, t/T); last = now;
+      const ease = 1-Math.pow(1-u, 2.6), slow = Math.pow(1-u, 1.2);
+      for(const d of ds){
+        const fr = Math.exp(-1.6*dt); d.vx *= fr; d.vy *= fr;
+        d.x += d.vx*dt*slow; d.y += d.vy*dt*slow;
+        if(d.x<edge){ d.x = edge; d.vx = Math.abs(d.vx)*0.78; kick(d, now); thud(now, Math.abs(d.vx)*slow); }
+        else if(d.x>vw-edge){ d.x = vw-edge; d.vx = -Math.abs(d.vx)*0.78; kick(d, now); thud(now, Math.abs(d.vx)*slow); }
+        if(d.y<edge){ d.y = edge; d.vy = Math.abs(d.vy)*0.78; kick(d, now); thud(now, Math.abs(d.vy)*slow); }
+        else if(d.y>vh-edge){ d.y = vh-edge; d.vy = -Math.abs(d.vy)*0.78; kick(d, now); thud(now, Math.abs(d.vy)*slow); }
+        const P = d.p;
+        d.ax = P.ax0 + (P.ax1-P.ax0)*ease; d.ay = P.ay0 + (P.ay1-P.ay0)*ease;
+        d.az = P.az0 + (P.az1-P.az0)*ease + P.kick*(1-ease);
+        d.h = Math.abs(Math.sin(t*5.2+0.3))*Math.exp(-1.8*t)*1.1*(1-u);
+      }
+      const [A,B] = ds, dx = B.x-A.x, dy = B.y-A.y, dist = Math.hypot(dx,dy) || 1, gap = size*1.08;
+      if(dist<gap){ const nx = dx/dist, ny = dy/dist, push = (gap-dist)/2;
+        A.x -= nx*push; A.y -= ny*push; B.x += nx*push; B.y += ny*push;
+        const rel = (B.vx-A.vx)*nx + (B.vy-A.vy)*ny;
+        if(rel<0){ A.vx += rel*nx; A.vy += rel*ny; B.vx -= rel*nx; B.vy -= rel*ny; kick(A, now); kick(B, now); thud(now, -rel*slow); } }
+      ds.forEach(d=>placeDie(d, size));
+      if(u>=1){ finishThrow(); return; }
+      requestAnimationFrame(step);
+    };
+    const finishThrow = async () => {
+      layer.dataset.faces = vals.join(',');
+      await sleep(520);
+      show();
+      await layer.animate([{opacity:1},{opacity:0}], {duration:220, fill:'forwards'}).finished.catch(()=>{});
+      layer.remove(); if(ui.held && ui.held.layer===layer) ui.held = null; done();
+    };
+    requestAnimationFrame(step);
+  });
+}
+/* Celebrations: a burst for home runs, confetti for the final out of a win. */
+async function homerBurst(){
+  const box = $('.dicebox'); if(!box || reducedMotion() || !box.animate) return;
+  const rays = Array.from({length:12}, (_,k)=>{ const a = k*Math.PI/6, r1 = 26, r2 = 48;
+    return `<line x1="${50+r1*Math.cos(a)}" y1="${50+r1*Math.sin(a)}" x2="${50+r2*Math.cos(a)}" y2="${50+r2*Math.sin(a)}"/>`; }).join('');
+  const d = document.createElement('div'); d.innerHTML = `<svg class="burst" viewBox="0 0 100 100" aria-hidden="true">${rays}</svg>`;
+  const svg = d.firstChild; box.appendChild(svg);
+  const a = svg.animate([{transform:'scale(.45)', opacity:0},{transform:'scale(1)', opacity:1, offset:.35},{transform:'scale(1.3)', opacity:0}], {duration:900, easing:'ease-out'});
+  a.finished.then(()=>svg.remove()).catch(()=>svg.remove());
+}
+function confetti(color){
+  if(reducedMotion()) return;
+  const colors = [color, '#FFFFFF', '#F3D23B', '#1C4E8A', '#C8402B'];
+  for(let k=0;k<70;k++){
+    const d = document.createElement('i'); d.className = 'confetti';
+    d.style.cssText = `left:50%;top:40%;background:${colors[k%colors.length]};width:${6+Math.random()*6}px;height:${9+Math.random()*7}px`;
+    document.body.appendChild(d);
+    const a = Math.random()*Math.PI*2, v = 120+Math.random()*260, dx = Math.cos(a)*v, dy = Math.sin(a)*v - 120;
+    d.animate([{transform:'translate(0,0) rotate(0)', opacity:1},{transform:`translate(${dx}px,${dy}px) rotate(${Math.random()*540}deg)`, opacity:1, offset:.55},
+      {transform:`translate(${dx*1.15}px,${dy+320}px) rotate(${Math.random()*900}deg)`, opacity:0}], {duration:1600+Math.random()*900, easing:'cubic-bezier(.2,.7,.4,1)'}).finished.then(()=>d.remove()).catch(()=>d.remove());
+  }
+}
+
+/* =====================================================================
+   GAME FLOW
+   ===================================================================== */
+function describe(ev){
+  const parts = [];
+  if(ev.battle) parts.push(ev.batterWins ? 'The batter wins the battle' : 'The defender wins the battle');
+  if(ev.runs) parts.push(`${ev.runs} run${ev.runs>1?'s':''} score${ev.runs>1?'':'s'}`);
+  else if(ev.kind!=='out' && !ev.battle) parts.push('No runs');
+  if(ev.outs) parts.push(`${ev.outs} out${ev.outs>1?'s':''}`);
+  if(ev.walkoff) parts.push('Walk-off win!');
+  else if(ev.halfEnded && !ev.over) parts.push('Three outs: switching sides');
+  return {title:ev.label, sub:parts.join(' · '), tone: ev.kind==='out' ? 'bad' : 'good'};
+}
+function sound(ev){
+  if(ev.id==='HR' && !ev.robbed) sfx.play('fanfare');
+  else if(ev.kind==='hit') sfx.play('hit');
+  else if(ev.kind==='walk') sfx.play('walk');
+  else sfx.play('out');
+}
+async function takeTurn(){
+  const s = ui.state; if(ui.busy || s.over) return;
+  ui.busy = true; ui.hist.push(JSON.stringify(s)); if(ui.hist.length>40) ui.hist.shift();
+  clearBot(); renderPanel();
+  if(s.pending){
+    ui.result = {title:'Battle!', sub:'Batter and defender each roll a die. Higher wins.', tone:'battle'}; renderPanel();
+    ui.labels = ['Batter','Defender']; $$('#dice .dlabel').forEach((e,k)=>e.textContent = ui.labels[k]);
+    const rounds = battleRounds(rng);
+    for(let i=0;i<rounds.length;i++){
+      await animateDice(rounds[i], false);
+      if(i<rounds.length-1){ ui.result = {title:'Tie!', sub:'Roll again', tone:'battle'}; box('#result', ui.result); await sleep(reducedMotion()?100:650); }
+    }
+    s.dice = rounds[rounds.length-1].slice();
+    const ev = resolveBattle(s, rounds);
+    ui.result = describe(ev); sound(ev); if(ev.id==='HR' && !ev.robbed) homerBurst();
+    afterPlay(ev);
+  } else {
+    ui.labels = null; ui.result = null; $('#result').innerHTML = '<span>&nbsp;</span>';
+    $$('#dice .dlabel').forEach(e=>e.textContent = '');
+    const dice = roll2(rng);
+    await animateDice(dice, false);
+    const ev = atBat(s, dice);
+    if(ev.battle){
+      ui.result = {title:'Battle!', sub:`${dice[0]}:${dice[1]} would be a ${ev.label}. The defender gets a say.`, tone:'battle'}; sfx.play('battle');
+    } else { ui.result = describe(ev); sound(ev); if(ev.id==='HR') homerBurst(); }
+    afterPlay(ev);
+  }
+}
+function box(sel, r){ const el = $(sel); el.className = 'result '+r.tone; el.innerHTML = `<b>${esc(r.title)}</b><span>${esc(r.sub||'')}</span>`; }
+function afterPlay(ev){
+  ui.busy = false; autosave(); renderAll();
+  const el = $('#result'); el.classList.add('pop');
+  if(ui.state.over){ setTimeout(showOver, reducedMotion()?50:900); return; }
+  scheduleBot();
+}
+function onRoll(){
+  if(ui.busy || ui.held || !ui.state || ui.state.over || dialogOpen() || actorIsBot()) return;
+  if(immersiveOn()) armRoll(()=>takeTurn());
+  else takeTurn();
+}
+function clearBot(){ if(ui.botTimer){ clearTimeout(ui.botTimer); ui.botTimer = null; } }
+function scheduleBot(){
+  clearBot();
+  if(!ui.state || ui.state.over || ui.busy || !actorIsBot()) return;
+  ui.botTimer = setTimeout(()=>{
+    ui.botTimer = null;
+    if(dialogOpen() || ui.busy || ui.held){ scheduleBot(); return; }
+    takeTurn();
+  }, reducedMotion() ? 120 : 1100);
+}
+function undo(){
+  if(ui.busy || ui.held || !ui.hist.length) return;
+  clearBot();
+  ui.state = JSON.parse(ui.hist.pop()); ui.result = null; ui.labels = null;
+  autosave(); renderAll(); toast('Last roll undone.'); scheduleBot();
+}
+
+/* ---------- Screens ---------- */
+function openDlg(id){ const d = $(id); if(!d.open) d.showModal(); return d; }
+function placeList(){ return `<datalist id="places">${PLACES.map(p=>`<option value="${esc(p)}">`).join('')}</datalist>`; }
+function pick2(){ const a = PLACES.slice(); const out = []; for(let i=0;i<2;i++) out.push(a.splice(Math.floor(Math.random()*a.length),1)[0]); return out; }
+function showSetup(prefill){
+  let saved = null; try{ saved = JSON.parse(LS.get(KEY_SETUP)); }catch(e){}
+  const cfg = prefill || saved || {teams:[{name:'Dallas',bot:false},{name:'Austin',bot:true}], innings:9};
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const teamRow = (t,label) => `<div class="field-row"><label>${label}<input type="text" name="name${t}" maxlength="20" list="places" value="${esc(cfg.teams[t].name)}" required></label>
+    <div class="seg" role="group" aria-label="${label} player"><button type="button" class="btn small" data-pt="${t}" data-bot="0" aria-pressed="${!cfg.teams[t].bot}">Person</button><button type="button" class="btn small" data-pt="${t}" data-bot="1" aria-pressed="${!!cfg.teams[t].bot}">Computer</button></div></div>`;
+  $('#setup-body').innerHTML = `<h2>New game</h2>
+    <p class="hint">Two teams, one screen. The visitors bat first.</p>
+    <form id="setup-form">
+      ${teamRow(0,'Visitors')}${teamRow(1,'Home')}${placeList()}
+      <div class="field-row"><label>Innings<select name="innings">${[3,5,7,9].map(n=>`<option value="${n}" ${cfg.innings===n?'selected':''}>${n}</option>`).join('')}</select></label>
+        <button type="button" class="btn small" id="shuffle">Pick teams for me</button></div>
+      <div class="row-btns"><button class="btn primary" type="submit">Play ball</button>
+        <button class="btn" type="button" id="open-chart">Dice chart</button>
+        ${ui.installEvt && !standalone ? '<button class="btn" type="button" id="install-btn">Install app</button>' : ''}</div>
+      ${isIOS && !standalone ? '<p class="hint">To install on iPhone or iPad: tap Share, then Add to Home Screen.</p>' : ''}
+    </form>`;
+  const d = openDlg('#setup');
+  const form = $('#setup-form', d);
+  d._bots = [!!cfg.teams[0].bot, !!cfg.teams[1].bot];
+  $$('[data-pt]', d).forEach(b=>b.addEventListener('click', ()=>{
+    const t = +b.dataset.pt; d._bots[t] = b.dataset.bot==='1';
+    $$(`[data-pt="${t}"]`, d).forEach(x=>x.setAttribute('aria-pressed', String((x.dataset.bot==='1')===d._bots[t])));
+  }));
+  $('#shuffle', d).addEventListener('click', ()=>{ const [a,b] = pick2(); form.name0.value = a; form.name1.value = b; });
+  $('#open-chart', d).addEventListener('click', showChart);
+  const ib = $('#install-btn', d); if(ib) ib.addEventListener('click', async ()=>{ const e = ui.installEvt; ui.installEvt = null; if(e){ e.prompt(); await e.userChoice.catch(()=>{}); } ib.remove(); });
+  form.addEventListener('submit', e=>{
+    e.preventDefault();
+    const names = [form.name0.value.trim()||'Visitors', form.name1.value.trim()||'Home'];
+    if(names[0].toLowerCase()===names[1].toLowerCase()) names[1] += ' 2';
+    const c = {teams:[{name:names[0],bot:d._bots[0]},{name:names[1],bot:d._bots[1]}], innings:+form.innings.value};
+    LS.set(KEY_SETUP, JSON.stringify(c));
+    d.close(); startGame(c);
+  });
+}
+function startGame(cfg){
+  clearBot(); ui.state = newGame(cfg); ui.hist = []; ui.result = null; ui.labels = null; ui.busy = false;
+  $('#app').hidden = false; autosave(); renderAll();
+  logLine(ui.state, `Play ball! ${ui.state.teams[0].name} visit ${ui.state.teams[1].name}.`); renderLog();
+  scheduleBot();
+}
+function showStart(){
+  let o = null; try{ o = JSON.parse(LS.get(KEY_AUTO)); }catch(e){}
+  if(validState(o) && !o.over){
+    $('#start-body').innerHTML = `<h2>Diceball</h2><p>A game is in progress: ${esc(o.teams[0].name)} ${teamRuns(o,0)}, ${esc(o.teams[1].name)} ${teamRuns(o,1)}, ${o.half===0?'top':'bottom'} of the ${ordinal(o.inning)}.</p>
+      <div class="row-btns"><button class="btn primary" id="resume">Resume game</button><button class="btn" id="fresh">Start a new game</button></div>`;
+    const d = openDlg('#start');
+    $('#resume', d).addEventListener('click', ()=>{ d.close(); resumeGame(o); });
+    $('#fresh', d).addEventListener('click', ()=>askConfirm('Start a new game?', 'This ends the game in progress.', 'Start new game', ()=>{ d.close(); showSetup(); }));
+  } else showSetup();
+}
+function resumeGame(o){
+  clearBot(); ui.state = o; ui.hist = []; ui.result = null; ui.labels = null; ui.busy = false;
+  $('#app').hidden = false; renderAll(); if(o.over) showOver(); else scheduleBot();
+}
+function askConfirm(title, text, yes, fn){
+  $('#confirm-body').innerHTML = `<h2>${esc(title)}</h2><p>${esc(text)}</p><div class="row-btns"><button class="btn danger" id="c-yes">${esc(yes)}</button><button class="btn" id="c-no">Cancel</button></div>`;
+  const d = openDlg('#confirm');
+  $('#c-no', d).addEventListener('click', ()=>d.close());
+  $('#c-yes', d).addEventListener('click', ()=>{ d.close(); fn(); });
+}
+function showOver(){
+  const s = ui.state; if(!s || !s.over || $('#over').open) return;
+  clearBot(); sfx.play('victory'); confetti(s.winner===0 ? '#1C4E8A' : '#C8402B');
+  const w = s.teams[s.winner].name;
+  $('#over-body').innerHTML = `<h2>${esc(w)} win${s.walkoff?' it on a walk-off':''}!</h2>
+    <p style="font-size:1.4rem;font-family:var(--cond);font-weight:700">${esc(s.teams[0].name)} ${teamRuns(s,0)}, ${esc(s.teams[1].name)} ${teamRuns(s,1)}</p>
+    <p class="hint">Hits: ${esc(s.teams[0].name)} ${s.hits[0]}, ${esc(s.teams[1].name)} ${s.hits[1]}${s.inning>s.innings?` · ${s.inning} innings`:''}</p>
+    <div class="row-btns"><button class="btn primary" id="rematch">Rematch</button><button class="btn" id="newg">New game</button><button class="btn ghost" id="closeo">View scoreboard</button></div>`;
+  const d = openDlg('#over');
+  $('#rematch', d).addEventListener('click', ()=>{ d.close(); startGame({teams:s.teams, innings:s.innings}); });
+  $('#newg', d).addEventListener('click', ()=>{ d.close(); showSetup({teams:s.teams, innings:s.innings}); });
+  $('#closeo', d).addEventListener('click', ()=>{ d.close(); renderAll(); });
+}
+function showChart(){
+  const rows = Object.keys(CHART).map(k=>{ const o = OUTCOMES[CHART[k]], [a,b] = k.split('-'), good = o.good;
+    const cnt = a===b ? 1 : 2;
+    return `<tr><td><span class="pp"><span class="mini">${a}</span><span class="mini">${b}</span></span></td><td class="${good?'g':'b'}">${o.label}${BATTLE_KEYS.includes(k)?' ⚔':''}</td><td>${cnt}/36</td></tr>`; }).join('');
+  $('#chart-body').innerHTML = `<h2>Dice chart</h2><p class="hint">Green helps the batter, orange helps the defense. ⚔ means a Battle: batter and defender each roll one die, higher wins, ties roll again. If the defender wins, it is an out.</p>
+    <table class="chart"><thead><tr><th>Roll</th><th>Result</th><th>Odds</th></tr></thead><tbody>${rows}</tbody></table>
+    <h3>Base running</h3><p class="hint">Single: runners move up 1. Double: 2. Triple: every runner scores. Home run: everyone scores. Walk or hit by pitch: runners move only if forced. Outs never move runners. A double play is 2 outs and a triple play is 3 outs.</p>`;
+  openDlg('#chartdlg');
+}
+function showMenu(){
+  const seg = (name, opts, cur) => `<div class="seg" role="group" aria-label="${name}">${opts.map(([v,l])=>`<button class="btn small" data-set="${name}" data-v="${v}" aria-pressed="${cur===v}">${l}</button>`).join('')}</div>`;
+  $('#menu-body').innerHTML = `<h2>Menu</h2>
+    <h3>Dice rolling</h3>${seg('roll', [['classic','Classic'],['immersive','Immersive']], ui.rollStyle)}
+    <p class="hint">Classic: tap Roll dice and they roll right away. Immersive: tap Roll dice to pick up 3D dice, then flick or tap to throw them across the screen.</p>
+    <h3>Animations</h3>${seg('motion', [['on','On'],['off','Off']], ui.motion)}
+    <h3>Appearance</h3>${seg('theme', [['light','Light'],['dark','Dark']], ui.theme)}
+    <h3>Game log</h3>${seg('log', [['0','Hidden'],['1','Shown']], ui.showLog?'1':'0')}
+    <div class="row-btns"><button class="btn" id="m-chart">Dice chart</button><button class="btn danger" id="m-new">New game</button></div>
+    <p class="hint">Version ${esc(APP_VERSION)}. New versions install on their own. <button class="btn small ghost" id="m-wn">What’s new</button></p>`;
+  const d = openDlg('#menu');
+  $$('[data-set]', d).forEach(b=>b.addEventListener('click', ()=>{
+    const k = b.dataset.set, v = b.dataset.v;
+    if(k==='roll'){ ui.rollStyle = v==='immersive' ? 'immersive' : 'classic'; LS.set(KEY_ROLL, ui.rollStyle); }
+    if(k==='motion'){ ui.motion = v==='off' ? 'off' : 'on'; LS.set(KEY_MOTION, ui.motion); applyMotion(); }
+    if(k==='theme'){ ui.theme = v==='dark' ? 'dark' : 'light'; LS.set(KEY_THEME, ui.theme); applyTheme(); }
+    if(k==='log'){ ui.showLog = v==='1'; LS.set(KEY_LOG, v); renderLog(); }
+    $$(`[data-set="${k}"]`, d).forEach(x=>x.setAttribute('aria-pressed', String(x.dataset.v===v)));
+  }));
+  $('#m-chart', d).addEventListener('click', ()=>{ d.close(); showChart(); });
+  $('#m-wn', d).addEventListener('click', ()=>{ d.close(); showWhatsNew(RELEASES.slice(0,3), true); });
+  $('#m-new', d).addEventListener('click', ()=>{ d.close(); if(ui.state && !ui.state.over) askConfirm('Start a new game?', 'This ends the game in progress.', 'Start new game', ()=>showSetup()); else showSetup(); });
+}
+
+/* ---------- Controls ---------- */
+$('#rollbtn').addEventListener('click', onRoll);
+$('#undo').addEventListener('click', undo);
+$('#gear').addEventListener('click', showMenu);
+$('#snd').addEventListener('click', ()=>{ ui.muted = !ui.muted; LS.set(KEY_MUTE, ui.muted?'1':'0'); renderAll(); });
+$('#fs').addEventListener('click', ()=>{ try{ document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen(); }catch(e){} });
+if(!document.documentElement.requestFullscreen) $('#fs').hidden = true;
+$$('dialog [data-close]').forEach(b=>b.addEventListener('click', ()=>b.closest('dialog').close()));
+$('#start').addEventListener('cancel', e=>e.preventDefault());
+$('#setup').addEventListener('cancel', e=>{ if(!ui.state) e.preventDefault(); });
+$$('dialog').forEach(d=>d.addEventListener('close', ()=>{ if(ui.state){ renderPanel(); scheduleBot(); } }));
+document.addEventListener('keydown', e=>{
+  if(!ui.state || e.altKey || e.metaKey || e.ctrlKey || dialogOpen() || $('#app').hidden) return;
+  if(e.target.closest && e.target.closest('input,select,textarea')) return;
+  const k = e.key.toLowerCase();
+  if(k===' ' || k==='enter' || k==='r'){ if(document.activeElement && document.activeElement.tagName==='BUTTON' && document.activeElement.id!=='rollbtn') return; e.preventDefault(); onRoll(); }
+  else if(k==='u') undo();
+  else if(k==='m') showMenu();
+});
+
+/* ---------- Installable app, updates, What's new ---------- */
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); ui.installEvt = e; });
+window.addEventListener('appinstalled', ()=>{ ui.installEvt = null; toast('Diceball is installed. Open it from your home screen.'); });
+if('serviceWorker' in navigator && /^https?:$/.test(location.protocol)){
+  window.addEventListener('load', ()=>navigator.serviceWorker.register('sw.js').catch(err=>console.warn('Offline mode unavailable:', err)));
+}
+/* The deploy step publishes version.json. When it names a version other than the one running,
+   the page saves the game, reloads, and picks the game back up where it was. */
+function applyUpdateWhenIdle(version){
+  if(applyUpdateWhenIdle.waiting) return; applyUpdateWhenIdle.waiting = true;
+  toast('A new version is available. Updating…');
+  const tick = ()=>{
+    if(ui.busy || ui.held || dialogOpen()){ setTimeout(tick, 1000); return; }
+    clearBot(); autosave();
+    LS.set(KEY_RELOAD, version);
+    if(ui.state && !ui.state.over && !$('#app').hidden) LS.set(KEY_RESUME, '1');
+    location.reload();
+  };
+  setTimeout(tick, 1800);
+}
+async function checkForUpdate(){
+  if(!/^https?:$/.test(location.protocol) || navigator.onLine===false) return;
+  try{
+    const r = await fetch('version.json?t=' + Date.now(), {cache:'no-store'});
+    if(!r.ok) return;
+    const v = (await r.json()).version;
+    if(typeof v!=='string' || v===APP_VERSION) return;
+    if(LS.get(KEY_RELOAD)===v) return;
+    applyUpdateWhenIdle(v);
+  }catch(e){}
+}
+setTimeout(checkForUpdate, 3000);
+setInterval(checkForUpdate, 5*60*1000);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkForUpdate(); });
+window.addEventListener('online', checkForUpdate);
+function showWhatsNew(list, manual){
+  const when = d => new Date(d+'T12:00:00').toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'});
+  $('#wn-body').innerHTML = `<h2 id="wn-title">What’s new</h2>
+    <p>${manual ? `You’re on version ${esc(APP_VERSION)}.` : `Diceball is now on version ${esc(APP_VERSION)}.${ui.state && !ui.state.over ? ' Your game is right where you left it.' : ''}`}</p>
+    ${list.map(r=>`<section class="rel"><h3>${esc(r.title)}</h3><p class="meta">Version ${esc(r.version)}${r.date ? ', '+when(r.date) : ''}</p><ul>${r.changes.map(c=>`<li>${esc(c)}</li>`).join('')}</ul></section>`).join('')}
+    <div class="row-btns"><button class="btn primary" id="wn-close" autofocus>Got it</button></div>`;
+  const dlg = $('#whatsnew'); if(!dlg.open) dlg.showModal();
+  $('#wn-close', dlg).addEventListener('click', ()=>dlg.close());
+  $('#wn-body').scrollTop = 0;
+}
+$('#whatsnew').addEventListener('close', ()=>{ LS.set(KEY_SEEN, APP_VERSION); });
+function maybeShowWhatsNew(){
+  let seen = LS.get(KEY_SEEN);
+  if(!seen){ LS.set(KEY_SEEN, APP_VERSION); return false; }   // a first-time player has nothing to catch up on
+  if(seen===APP_VERSION) return false;
+  const i = RELEASES.findIndex(r=>r.version===seen);
+  showWhatsNew(i<0 ? RELEASES.slice(0,1) : RELEASES.slice(0,i), false);
+  return true;
+}
+
+/* ---------- Start ---------- */
+window.__dd = {ui, engine:{OUTCOMES, CHART, BATTLE_KEYS, newGame, atBat, applyOutcome, battleRounds, resolveBattle, endHalf, teamRuns, keyOf, roll2},
+  startGame, takeTurn, undo, get state(){ return ui.state; }, APP_VERSION, RELEASES};
+applyMotion(); applyTheme();
+if(LS.get(KEY_RESUME)==='1'){
+  LS.del(KEY_RESUME);
+  let o = null; try{ o = JSON.parse(LS.get(KEY_AUTO)); }catch(e){}
+  if(validState(o) && !o.over) resumeGame(o); else showStart();
+} else showStart();
+maybeShowWhatsNew();
+</script>
+</body>
+</html>
