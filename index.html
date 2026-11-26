@@ -49,26 +49,27 @@ button{font:inherit;color:inherit}
 .bar .btn{min-width:42px;min-height:40px}
 /* scoreboard */
 .card{background:var(--sheet);border:2px solid var(--line);border-radius:10px;overflow:hidden}
-table.line{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;text-align:center}
-.line th,.line td{padding:6px 3px;font-size:.95rem;border-bottom:1px solid var(--line-soft)}
-.line thead th{font-family:var(--cond);font-weight:600;color:var(--muted);font-size:.8rem}
+#score{background:#163A28;border-color:#0F2A1C;color:#F4EBD0}
+table.line{width:100%;font-family:var(--cond);border-collapse:collapse;font-variant-numeric:tabular-nums;text-align:center}
+.line th,.line td{padding:7px 3px;font-size:1.05rem;border-bottom:1px solid rgba(255,255,255,.12)}
+.line thead th{font-weight:600;color:#A9C2A8;font-size:.82rem;background:#11301F}
 .line tr:last-child td{border-bottom:0}
 .line td.nm,.line th.nm{text-align:left;padding-left:10px;font-family:var(--cond);font-stretch:condensed;font-weight:700;font-size:1.05rem;white-space:nowrap;max-width:9em;overflow:hidden;text-overflow:ellipsis}
-.line td.cur{background:var(--line-soft);font-weight:800}
-.line td.tot{font-weight:800;border-left:2px solid var(--line-soft);font-size:1.1rem}
-.sw{display:inline-block;width:.7em;height:.7em;border-radius:50%;margin-right:.45em;vertical-align:baseline}
+.line td.cur{background:#F3D23B;color:#163A28;font-weight:800}
+.line td.tot{font-weight:800;border-left:2px solid rgba(255,255,255,.2);font-size:1.2rem;color:#F3D23B}
+.sw{display:inline-block;width:.75em;height:.75em;border-radius:50%;margin-right:.45em;vertical-align:baseline;border:1.5px solid #fff}
 .line tr.batting td.nm::after{content:" ⚾";font-size:.8em}
 .line-wrap{overflow-x:auto}
 /* field */
 .fieldbox{position:relative;line-height:0}
 #field{width:100%;height:auto;display:block}
-.runner{transition:opacity .2s,transform .25s;transform-origin:center;transform-box:fill-box}
+.runner{transition:opacity .25s,transform .3s cubic-bezier(.3,1.6,.5,1);transform-origin:center;transform-box:fill-box}
 .runner.off{opacity:0;transform:scale(.3)}
-.hud{position:absolute;left:8px;top:8px;line-height:1.2;font-family:var(--cond);font-stretch:condensed;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
-.hud b{font-size:1.5rem;display:block}
+.hud{position:absolute;left:8px;top:8px;line-height:1.15;background:rgba(10,24,16,.72);padding:5px 10px 6px;border-radius:8px;font-family:var(--cond);font-stretch:condensed;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.hud b{font-size:1.25rem;display:block}
 .hud span{font-size:.95rem}
-.outs{position:absolute;right:10px;top:10px;display:flex;gap:6px;align-items:center;line-height:1;color:#fff;font-family:var(--cond);font-size:.95rem;text-shadow:0 1px 2px rgba(0,0,0,.6)}
-.outs i{width:16px;height:16px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.25);display:inline-block;transition:background .2s}
+.outs{position:absolute;right:8px;top:8px;background:rgba(10,24,16,.72);padding:7px 9px;border-radius:8px;display:flex;gap:6px;align-items:center;line-height:1;color:#fff;font-family:var(--cond);font-size:.95rem;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.outs i{width:16px;height:16px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.35);display:inline-block;transition:background .2s}
 .outs i.on{background:#E5382B;border-color:#fff}
 /* at-bat panel */
 .panel{padding:12px 14px 14px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
@@ -143,21 +144,38 @@ input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(-
   </div>
   <section class="card line-wrap" id="score" aria-label="Scoreboard"></section>
   <section class="card fieldbox" aria-label="Field">
-    <svg id="field" viewBox="0 0 240 190" role="img" aria-label="Baseball diamond">
-      <rect width="240" height="190" fill="#3E8E57"/>
-      <g fill="#46995F"><rect x="0" y="0" width="240" height="24"/><rect x="0" y="48" width="240" height="24"/><rect x="0" y="96" width="240" height="24"/><rect x="0" y="144" width="240" height="24"/></g>
-      <polygon points="120,186 218,105 120,18 22,105" fill="#C9A06A"/>
-      <polygon points="120,150 160,105 120,62 80,105" fill="#3E8E57"/>
-      <polyline points="120,168 190,105 120,42 50,105 120,168" fill="none" stroke="#fff" stroke-width="2.2" opacity=".9"/>
-      <g fill="#fff" stroke="#8a6b3f" stroke-width="1">
-        <rect x="183" y="98" width="14" height="14" transform="rotate(45 190 105)"/>
-        <rect x="113" y="35" width="14" height="14" transform="rotate(45 120 42)"/>
-        <rect x="43" y="98" width="14" height="14" transform="rotate(45 50 105)"/>
-        <polygon points="120,160 128,166 125,174 115,174 112,166"/>
+    <svg id="field" viewBox="0 0 240 200" role="img" aria-label="Baseball field">
+      <defs>
+        <pattern id="crowd" width="9" height="6" patternUnits="userSpaceOnUse"><rect width="9" height="6" fill="#26352D"/><rect y="5" width="9" height="1" fill="#1A251F"/><circle cx="2" cy="3" r="1.1" fill="#8F8273"/><circle cx="6.5" cy="2.6" r="1.1" fill="#5E4A3D"/></pattern>
+        <pattern id="mow" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45 120 180)"><rect width="16" height="16" fill="#3C8C52"/><rect width="8" height="8" fill="#48A061"/><rect x="8" y="8" width="8" height="8" fill="#48A061"/></pattern>
+        <radialGradient id="dirt"><stop offset="0" stop-color="#D6A870"/><stop offset="1" stop-color="#B9844F"/></radialGradient>
+        <clipPath id="fair"><path d="M120,180 L0,60 L0,0 L240,0 L240,60 Z"/></clipPath>
+        <clipPath id="park"><path d="M0,67 A165,165 0 0 1 240,67 L240,200 L0,200 Z"/></clipPath>
+        <filter id="tokshadow" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="1.2" stdDeviation="1" flood-opacity=".5"/></filter>
+      </defs>
+      <rect width="240" height="200" fill="url(#crowd)"/>
+      <path d="M0,67 A165,165 0 0 1 240,67 L240,200 L0,200 Z" fill="url(#mow)"/>
+      <path d="M0,67 A165,165 0 0 1 240,67" fill="none" stroke="#B9844F" stroke-width="15" clip-path="url(#park)"/>
+      <path d="M0,67 A165,165 0 0 1 240,67" fill="none" stroke="#123623" stroke-width="3.2"/>
+      <path d="M0,68.6 A165,165 0 0 1 240,68.6" fill="none" stroke="#F3D23B" stroke-width=".7"/>
+      <g fill="#fff" opacity=".85" font-family="Arial,sans-serif" font-weight="700" font-size="6" text-anchor="middle"><text x="120" y="32">400</text><text x="40" y="61">375</text><text x="200" y="61">375</text></g>
+      <path d="M4,64 L4,50 M236,64 L236,50" stroke="#F3D23B" stroke-width="1.6"/>
+      <g clip-path="url(#fair)"><circle cx="120" cy="124" r="72" fill="url(#dirt)"/></g>
+      <circle cx="120" cy="178" r="17" fill="url(#dirt)"/>
+      <path d="M120,168 L166,122 L120,76 L74,122 Z" fill="url(#mow)" stroke="#3C8C52" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M120,180 L4,64 M120,180 L236,64" stroke="#fff" stroke-width="1.4" opacity=".92"/>
+      <circle cx="120" cy="124" r="9" fill="#C99A63"/><rect x="117" y="123.3" width="6" height="1.4" fill="#fff"/>
+      <g fill="none" stroke="#fff" stroke-width=".8" opacity=".85"><rect x="105" y="172" width="8" height="13"/><rect x="127" y="172" width="8" height="13"/></g>
+      <g fill="#fff" stroke="#8A6B3F" stroke-width=".6">
+        <rect x="174.5" y="118.5" width="7" height="7" transform="rotate(45 178 122)"/>
+        <rect x="116.5" y="60.5" width="7" height="7" transform="rotate(45 120 64)"/>
+        <rect x="58.5" y="118.5" width="7" height="7" transform="rotate(45 62 122)"/>
+        <polygon points="116,176 124,176 124,179.5 120,183 116,179.5"/>
       </g>
-      <circle class="runner off" id="r1" cx="190" cy="105" r="10" stroke="#fff" stroke-width="2.5"/>
-      <circle class="runner off" id="r2" cx="120" cy="42" r="10" stroke="#fff" stroke-width="2.5"/>
-      <circle class="runner off" id="r3" cx="50" cy="105" r="10" stroke="#fff" stroke-width="2.5"/>
+      <g transform="translate(178 114)"><g class="runner off" id="r1" filter="url(#tokshadow)"><circle r="7" stroke="#fff" stroke-width="2"/><path d="M-4,-1 A4.5,4.5 0 0 1 4,-1 L6.5,0.5 L-4,0.5 Z" fill="#000" opacity=".35"/></g></g>
+      <g transform="translate(120 56)"><g class="runner off" id="r2" filter="url(#tokshadow)"><circle r="7" stroke="#fff" stroke-width="2"/><path d="M-4,-1 A4.5,4.5 0 0 1 4,-1 L6.5,0.5 L-4,0.5 Z" fill="#000" opacity=".35"/></g></g>
+      <g transform="translate(62 114)"><g class="runner off" id="r3" filter="url(#tokshadow)"><circle r="7" stroke="#fff" stroke-width="2"/><path d="M-4,-1 A4.5,4.5 0 0 1 4,-1 L6.5,0.5 L-4,0.5 Z" fill="#000" opacity=".35"/></g></g>
+      <g transform="translate(109 177)"><g class="runner" id="batter" filter="url(#tokshadow)"><circle r="6" stroke="#fff" stroke-width="1.8"/><path d="M2,-2 L11,-9" stroke="#E8D3A8" stroke-width="2" stroke-linecap="round"/></g></g>
     </svg>
     <div class="hud" id="hud"></div>
     <div class="outs" id="outs"></div>
@@ -187,8 +205,12 @@ input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(-
    entry (newest first). The deploy step publishes the number as version.json, and
    running copies check it to know when to update themselves.
    ===================================================================== */
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const RELEASES = [
+  {version:'1.2.0', date:'2026-11-26', title:'A real ballpark', changes:[
+    'The field is now a ballpark: mowed grass, an infield dirt arc, pitcher’s mound, batter’s boxes, foul lines and poles, a warning track, the outfield wall with distances, and a crowd in the stands.',
+    'Runners are batting-helmet tokens in the team’s color that pop onto the bases, and the batter waits at the plate.',
+    'The linescore looks like a stadium scoreboard, with the current inning lit in yellow.']},
   {version:'1.1.0', date:'2026-11-26', title:'Battles are rolled by both players', changes:[
     'In a Battle, the batter now rolls their own die, then the defending team rolls theirs. Ties roll again. The computer rolls for its own side.',
     'The dice show Batter and Defender labels, and the Roll button says whose die is next.']},
@@ -422,13 +444,15 @@ function renderScore(){
       if(t===1 && s.homeSkipped && inn===s.inning) v = 'X';
       return `<td class="${cur?'cur':''}">${v}</td>`;
     }).join('');
-    return `<tr class="${!s.over && s.half===t?'batting':''}"><td class="nm"><span class="sw" style="background:${teamColor(t)}"></span>${esc(s.teams[t].name)}</td>${cells}<td class="tot">${teamRuns(s,t)}</td><td class="tot" style="border-left:1px solid var(--line-soft)">${s.hits[t]}</td></tr>`;
+    return `<tr class="${!s.over && s.half===t?'batting':''}"><td class="nm"><span class="sw" style="background:${teamColor(t)}"></span>${esc(s.teams[t].name)}</td>${cells}<td class="tot">${teamRuns(s,t)}</td><td class="tot" style="border-left:1px solid rgba(255,255,255,.12)">${s.hits[t]}</td></tr>`;
   };
   $('#score').innerHTML = `<table class="line"><thead><tr><th class="nm"></th>${head}<th class="tot">R</th><th>H</th></tr></thead><tbody>${row(0)}${row(1)}</tbody></table>`;
 }
 function renderField(){
   const s = ui.state;
-  [0,1,2].forEach(i=>{ const el = $('#r'+(i+1)); el.classList.toggle('off', !s.bases[i]); el.setAttribute('fill', s.half===0 ? '#1C4E8A' : '#C8402B'); });
+  const tc = s.half===0 ? '#1C4E8A' : '#C8402B';
+  [0,1,2].forEach(i=>{ const el = $('#r'+(i+1)); el.classList.toggle('off', !s.bases[i]); el.setAttribute('fill', tc); });
+  const bt = $('#batter'); bt.setAttribute('fill', tc); bt.classList.toggle('off', !!s.over);
   $('#hud').innerHTML = s.over ? '<b>Final</b>' : `<b>${s.half===0?'Top':'Bottom'} ${ordinal(s.inning)}</b><span>${esc(batTeam().name)} batting</span>`;
   $('#outs').innerHTML = `Outs ${[0,1,2].map(i=>`<i class="${i<s.outs?'on':''}"></i>`).join('')}`;
 }
