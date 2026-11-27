@@ -89,6 +89,19 @@ table.line{width:100%;font-family:var(--cond);border-collapse:collapse;font-vari
 .result.pop{animation:pop .25s ease-out}
 @keyframes pop{from{transform:scale(.85);opacity:0}to{transform:none;opacity:1}}
 #rollbtn{font-size:1.35rem;padding:.7em 1.6em;min-width:12em}
+.chartbox{padding:8px 8px 10px}
+.chartbox[hidden]{display:none}
+.chartbox h2{white-space:nowrap;font-family:var(--cond);font-stretch:condensed;font-size:1.05rem;margin:0 0 2px 4px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.chartbox h2 small{font-family:system-ui,sans-serif;font-weight:400;font-size:.72rem;color:var(--muted)}
+.cgrid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,auto);grid-template-columns:repeat(3,1fr);gap:4px 6px}
+.cc{display:flex;align-items:center;gap:6px;padding:3px 5px;border-radius:7px;border:1.5px solid transparent;background:var(--paper);min-width:0}
+.cc .nm{font-family:var(--cond);font-stretch:condensed;font-weight:700;font-size:.9rem;line-height:1.05}
+.cc.good .nm{color:var(--good)} .cc.bad .nm{color:var(--bad)}
+.cc.now{border-color:var(--ink);background:#F3D23B;box-shadow:0 0 0 2px #F3D23B}
+.cc.now .nm{color:#163A28}
+.dd2{display:flex;gap:3px;flex:none}
+.mdie{width:21px;height:21px;background:#fff;border:1.5px solid #13243D;border-radius:5px;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:2px}
+.mdie i{background:#13243D;border-radius:50%;margin:0;place-self:center;width:75%;height:75%}
 .log{max-height:11em;overflow:auto;padding:8px 12px;font-size:.9rem;line-height:1.45}
 .log div{border-bottom:1px solid var(--line-soft);padding:2px 0}
 .log[hidden]{display:none}
@@ -187,6 +200,7 @@ input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(-
     <div class="result" id="result" aria-live="polite"></div>
     <button class="btn primary" id="rollbtn">Roll dice</button>
   </section>
+  <section class="card chartbox" id="chartbox" aria-label="Dice chart"></section>
   <section class="card log" id="log" hidden aria-label="Game log"></section>
 </main>
 
@@ -205,8 +219,11 @@ input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(-
    entry (newest first). The deploy step publishes the number as version.json, and
    running copies check it to know when to update themselves.
    ===================================================================== */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const RELEASES = [
+  {version:'1.3.0', date:'2026-11-27', title:'Dice chart on screen', changes:[
+    'The dice chart now sits on the game screen, drawn with dice faces instead of numbers, and your last roll is highlighted.',
+    'Hide it any time in the Menu under Dice chart on screen.']},
   {version:'1.2.0', date:'2026-11-26', title:'A real ballpark', changes:[
     'The field is now a ballpark: mowed grass, an infield dirt arc, pitcher’s mound, batter’s boxes, foul lines and poles, a warning track, the outfield wall with distances, and a crowd in the stands.',
     'Runners are batting-helmet tokens in the team’s color that pop onto the bases, and the batter waits at the plate.',
@@ -321,7 +338,7 @@ function applyOutcome(s, id, robbed){
 /* Roll the batter's two dice. Good doubles start a Battle; everything else happens right away. */
 function atBat(s, dice){
   s.dice = [dice[0],dice[1]];
-  const key = keyOf(dice), id = CHART[key];
+  const key = keyOf(dice), id = CHART[key]; s.lastKey = key;
   if(BATTLE_KEYS.includes(key)){
     s.pending = {key, id, b:null, rounds:[]};
     logLine(s, `${halfTag(s)} ${s.teams[s.half].name}: ${dice[0]}:${dice[1]} ${OUTCOMES[id].label}... Battle!`);
@@ -357,7 +374,7 @@ const LS = {
   del(k){ try{ localStorage.removeItem(k); }catch(e){} },
 };
 const KEY_AUTO='dd.auto', KEY_SETUP='dd.setup', KEY_THEME='dd.theme', KEY_MOTION='dd.motion', KEY_MUTE='dd.mute',
-      KEY_ROLL='dd.roll', KEY_LOG='dd.log', KEY_SEEN='dd.seen', KEY_RELOAD='dd.reload', KEY_RESUME='dd.resume';
+      KEY_ROLL='dd.roll', KEY_LOG='dd.log', KEY_CHART='dd.chart', KEY_SEEN='dd.seen', KEY_RELOAD='dd.reload', KEY_RESUME='dd.resume';
 const PLACES = ['Austin','Dallas','Houston','San Antonio','El Paso','Fort Worth','Lubbock','Amarillo','Waco','Galveston','Tyler','Laredo',
   'Boston','Chicago','Denver','Seattle','Phoenix','Atlanta','Miami','Detroit','Portland','Nashville','Memphis','Omaha','Oakland','Tampa','Cleveland','Brooklyn'];
 const ui = {
@@ -367,6 +384,7 @@ const ui = {
   muted: LS.get(KEY_MUTE)==='1',
   rollStyle: LS.get(KEY_ROLL)==='immersive' ? 'immersive' : 'classic',
   showLog: LS.get(KEY_LOG)==='1',
+  showChart: LS.get(KEY_CHART)!=='0',
 };
 const rng = () => Math.random();
 const reducedMotion = () => ui.motion==='off';
@@ -482,11 +500,21 @@ function renderPanel(){
   btn.disabled = ui.busy || actorIsBot() || dialogOpen();
   $('#undo').disabled = ui.busy || !ui.hist.length;
 }
+const miniDice = k => `<span class="dd2">${k.split('-').map(v=>`<span class="mdie" aria-hidden="true">${pips(+v)}</span>`).join('')}</span>`;
+function renderChart(){
+  const box = $('#chartbox'); box.hidden = !ui.showChart; if(!ui.showChart) return;
+  const now = ui.state.lastKey;
+  const col = Object.keys(CHART);
+  box.innerHTML = `<h2>Dice chart <small>⚔ = battle</small></h2><div class="cgrid">${col.map(k=>{
+    const o = OUTCOMES[CHART[k]];
+    return `<div class="cc ${o.good?'good':'bad'}${k===now?' now':''}" aria-label="${k.replace('-',' and ')}: ${o.label}">${miniDice(k)}<span class="nm">${o.label}${BATTLE_KEYS.includes(k)?' ⚔':''}</span></div>`;
+  }).join('')}</div>`;
+}
 function renderLog(){
   const el = $('#log'); el.hidden = !ui.showLog;
   if(ui.showLog) el.innerHTML = ui.state.log.slice().reverse().map(l=>`<div>${esc(l)}</div>`).join('') || '<div>No plays yet.</div>';
 }
-function renderAll(){ renderScore(); renderField(); renderPanel(); renderLog(); $('#snd').setAttribute('aria-label', ui.muted ? 'Sound off' : 'Sound on'); $('#snd').textContent = ui.muted ? '🔇' : '🔊'; }
+function renderAll(){ renderScore(); renderField(); renderPanel(); renderChart(); renderLog(); $('#snd').setAttribute('aria-label', ui.muted ? 'Sound off' : 'Sound on'); $('#snd').textContent = ui.muted ? '🔇' : '🔊'; }
 
 /* =====================================================================
    DICE ANIMATION (the same tossed and Immersive 3D rolls as Propertyopoly)
@@ -843,8 +871,8 @@ function showOver(){
 }
 function showChart(){
   const rows = Object.keys(CHART).map(k=>{ const o = OUTCOMES[CHART[k]], [a,b] = k.split('-'), good = o.good;
-    const cnt = a===b ? 1 : 2;
-    return `<tr><td><span class="pp"><span class="mini">${a}</span><span class="mini">${b}</span></span></td><td class="${good?'g':'b'}">${o.label}${BATTLE_KEYS.includes(k)?' ⚔':''}</td><td>${cnt}/36</td></tr>`; }).join('');
+    const cnt = a===b ? 1 : 2; void b;
+    return `<tr><td>${miniDice(k)}</td><td class="${good?'g':'b'}">${o.label}${BATTLE_KEYS.includes(k)?' ⚔':''}</td><td>${cnt}/36</td></tr>`; }).join('');
   $('#chart-body').innerHTML = `<h2>Dice chart</h2><p class="hint">Green helps the batter, orange helps the defense. ⚔ means a Battle: batter and defender each roll one die, higher wins, ties roll again. If the defender wins, it is an out.</p>
     <table class="chart"><thead><tr><th>Roll</th><th>Result</th><th>Odds</th></tr></thead><tbody>${rows}</tbody></table>
     <h3>Base running</h3><p class="hint">Single: runners move up 1. Double: 2. Triple: every runner scores. Home run: everyone scores. Walk or hit by pitch: runners move only if forced. Outs never move runners. A double play is 2 outs and a triple play is 3 outs.</p>`;
@@ -857,6 +885,7 @@ function showMenu(){
     <p class="hint">Classic: tap Roll dice and they roll right away. Immersive: tap Roll dice to pick up 3D dice, then flick or tap to throw them across the screen.</p>
     <h3>Animations</h3>${seg('motion', [['on','On'],['off','Off']], ui.motion)}
     <h3>Appearance</h3>${seg('theme', [['light','Light'],['dark','Dark']], ui.theme)}
+    <h3>Dice chart on screen</h3>${seg('chart', [['1','Shown'],['0','Hidden']], ui.showChart?'1':'0')}
     <h3>Game log</h3>${seg('log', [['0','Hidden'],['1','Shown']], ui.showLog?'1':'0')}
     <div class="row-btns"><button class="btn" id="m-chart">Dice chart</button><button class="btn danger" id="m-new">New game</button></div>
     <p class="hint">Version ${esc(APP_VERSION)}. New versions install on their own. <button class="btn small ghost" id="m-wn">What’s new</button></p>`;
@@ -866,6 +895,7 @@ function showMenu(){
     if(k==='roll'){ ui.rollStyle = v==='immersive' ? 'immersive' : 'classic'; LS.set(KEY_ROLL, ui.rollStyle); }
     if(k==='motion'){ ui.motion = v==='off' ? 'off' : 'on'; LS.set(KEY_MOTION, ui.motion); applyMotion(); }
     if(k==='theme'){ ui.theme = v==='dark' ? 'dark' : 'light'; LS.set(KEY_THEME, ui.theme); applyTheme(); }
+    if(k==='chart'){ ui.showChart = v==='1'; LS.set(KEY_CHART, v); renderChart(); }
     if(k==='log'){ ui.showLog = v==='1'; LS.set(KEY_LOG, v); renderLog(); }
     $$(`[data-set="${k}"]`, d).forEach(x=>x.setAttribute('aria-pressed', String(x.dataset.v===v)));
   }));

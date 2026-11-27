@@ -134,7 +134,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 3. Computer against computer, through the interface, to the final out
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.motion', 'off'); localStorage.setItem('dd.seen', '1.2.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.motion', 'off'); localStorage.setItem('dd.seen', '1.3.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="0"][data-bot="1"]');
@@ -154,7 +154,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 4. A person's turns, with animations on, a battle and undo
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.2.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.3.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
@@ -171,6 +171,9 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
   await page.click('#undo');
   const after = await page.evaluate(() => JSON.stringify(__dd.state));
   check(before !== after, 'interface: undo changed nothing');
+  check((await page.locator('#chartbox .cc').count()) === 21, 'chart: expected 21 cells on screen');
+  check((await page.locator('#chartbox .mdie').count()) === 42, 'chart: expected dice faces, two per roll');
+  check((await page.locator('#chartbox .cc.now').count()) === 1, 'chart: the last roll was not highlighted');
   // Force a battle: the batter rolls a die, then the defender rolls theirs (ties roll again)
   await page.evaluate(() => { const s = __dd.state; s.pending = { key: '1-1', id: 'HR', b: null, rounds: [] }; s.outs = 0; s.bases = [0, 0, 0]; s.teams[0].bot = false; s.teams[1].bot = false; renderAll(); });
   check((await page.innerText('#rollbtn')) === 'Batter: roll your die', 'battle: first button should be the batter\'s die');
@@ -200,7 +203,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 5. Immersive 3D throw
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.roll', 'immersive'); localStorage.setItem('dd.seen', '1.2.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.roll', 'immersive'); localStorage.setItem('dd.seen', '1.3.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
@@ -227,7 +230,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 6. Installable app: manifest, service worker, offline
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.2.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.3.0'); });
   await page.goto(url);
   const man = await (await page.request.get(url + 'manifest.webmanifest')).json();
   check(man.display === 'standalone' && man.icons.length >= 3, 'manifest incomplete');
@@ -251,7 +254,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
   await page.goto(url);
   // A player from an older version sees What's new on opening
   await page.waitForSelector('#whatsnew[open]');
-  check(/A real ballpark/.test(await page.innerText('#wn-body')), "What's new did not list the release");
+  check(/Dice chart on screen/.test(await page.innerText('#wn-body')), "What's new did not list the release");
   await page.click('#wn-close');
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
