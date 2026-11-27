@@ -143,6 +143,9 @@ input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(-
 .throw-cancel,#throw .throw-cancel{position:absolute;top:calc(12px + env(safe-area-inset-top));right:12px;background:#fff;color:#13243D;border-color:#fff}
 .burst{position:absolute;left:50%;top:50%;width:230px;height:230px;margin:-115px 0 0 -115px;pointer-events:none;z-index:5;overflow:visible}
 .burst line{stroke:var(--home);stroke-width:4;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.fxrun{font:700 9px Arial,sans-serif;fill:#F3D23B;stroke:#123623;stroke-width:2.2px;paint-order:stroke;text-anchor:middle}
+#field.snap .runner{transition:none}
+.result span.pbp{color:var(--ink);font-size:1rem;display:block;margin-bottom:2px}
 .confetti{position:fixed;z-index:2500;pointer-events:none;border-radius:2px}
 </style>
 </head>
@@ -219,8 +222,12 @@ input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(-
    entry (newest first). The deploy step publishes the number as version.json, and
    running copies check it to know when to update themselves.
    ===================================================================== */
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const RELEASES = [
+  {version:'1.4.0', date:'2026-11-27', title:'Plays come to life', changes:[
+    'The ball now goes where the play went: line drives into the gaps, fly balls caught in the outfield, grounders thrown across to first, and home runs that clear the wall.',
+    'Runners run the bases one at a time, and each run that scores pops a +1 at the plate.',
+    'Every at-bat gets a play-by-play line, such as “Austin doubles to left-center,” in the result and the game log.']},
   {version:'1.3.0', date:'2026-11-27', title:'Dice chart on screen', changes:[
     'The dice chart now sits on the game screen, drawn with dice faces instead of numbers, and your last roll is highlighted.',
     'Hide it any time in the Menu under Dice chart on screen.']},
@@ -309,6 +316,7 @@ function applyOutcome(s, id, robbed){
   const o = OUTCOMES[id], t = s.half, b = s.bases, name = s.teams[t].name, tag = halfTag(s);
   let runs = 0, outs = o.outs||0, n = [b[0],b[1],b[2]];
   const on = b[0]+b[1]+b[2];
+  const mv = [];
   if(id==='HR'){ runs = on+1; n = [0,0,0]; }
   else if(id==='3B'){ runs = on; n = [0,0,1]; }
   else if(id==='2B'){ runs = b[1]+b[2]; n = [0,1,b[0]]; }
@@ -318,13 +326,25 @@ function applyOutcome(s, id, robbed){
     n[0] = 1;
   }
   const label = robbed ? (ROBBED[id]||'Robbed!') : o.label;
+  if(!robbed){
+    if(id==='HR'){ [3,2,1].forEach(i=>{ if(b[i-1]) mv.push({from:i,to:4}); }); mv.push({from:0,to:4}); }
+    else if(id==='3B'){ [3,2,1].forEach(i=>{ if(b[i-1]) mv.push({from:i,to:4}); }); mv.push({from:0,to:3}); }
+    else if(id==='2B'){ [3,2,1].forEach(i=>{ if(b[i-1]) mv.push({from:i,to:Math.min(4,i+2)}); }); mv.push({from:0,to:2}); }
+    else if(id==='1B'){ [3,2,1].forEach(i=>{ if(b[i-1]) mv.push({from:i,to:i+1}); }); mv.push({from:0,to:1}); }
+    else if(o.kind==='walk'){
+      if(b[0]&&b[1]&&b[2]) mv.push({from:3,to:4});
+      if(b[0]&&b[1]) mv.push({from:2,to:3});
+      if(b[0]) mv.push({from:1,to:2});
+      mv.push({from:0,to:1});
+    }
+  }
   if(robbed){ outs = 1; runs = 0; n = [b[0],b[1],b[2]]; }
   s.bases = n;
   if(o.kind==='hit' && !robbed) s.hits[t]++;
   addRuns(s, runs);
   s.outs = Math.min(3, s.outs+outs);
   logLine(s, `${tag} ${name}: ${label}${runs?`, ${runs} run${runs>1?'s':''} score`:''}${outs?` (${s.outs>=3?'3':s.outs} out${s.outs===1?'':'s'})`:''}.`);
-  const ev = {id, label, runs, outs, robbed:!!robbed, kind:robbed?'out':o.kind, halfEnded:false, over:false, walkoff:false};
+  const ev = {id, label, runs, outs, robbed:!!robbed, moves:mv, kind:robbed?'out':o.kind, halfEnded:false, over:false, walkoff:false};
   // Walk-off: the home team takes the lead in the last inning or later and the game ends at once.
   if(runs && t===1 && s.inning>=s.innings && teamRuns(s,1)>teamRuns(s,0)){
     finish(s, 1, 'walkoff'); ev.over = true; ev.walkoff = true; return ev;
@@ -432,6 +452,7 @@ const sfx = {
     if(ui.muted) return;
     switch(name){
       case 'dice': for(let k=0;k<6;k++) this.noise(0.035, {when:k*0.065+Math.random()*0.02, freq:1500+Math.random()*1500, q:3, gain:0.35}); break;
+      case 'step': this.tone(940, 0.045, {type:'triangle', gain:0.05}); break;
       case 'thud': this.tone(95, 0.18, {gain:0.22, slide:48}); this.noise(0.07, {freq:300, q:1.5, gain:0.35}); break;
       case 'hit': this.noise(0.05, {freq:1200, q:4, gain:0.6}); this.tone(660, 0.12, {gain:0.1}); this.tone(990, 0.2, {when:0.08, gain:0.1}); break;
       case 'out': this.tone(300, 0.25, {type:'triangle', gain:0.1, slide:150}); break;
@@ -493,7 +514,7 @@ function renderPanel(){
   }
   const r = ui.result, box = $('#result');
   box.className = 'result' + (r ? ' '+r.tone : '');
-  box.innerHTML = r ? `<b>${esc(r.title)}</b><span>${esc(r.sub||'')}</span>` : '<span>&nbsp;</span>';
+  box.innerHTML = r ? `<b>${esc(r.title)}</b>${r.pbp?`<span class="pbp">${esc(r.pbp)}</span>`:''}<span>${esc(r.sub||'')}</span>` : '<span>&nbsp;</span>';
   const btn = $('#rollbtn');
   btn.textContent = s.pending ? (s.pending.b==null ? 'Batter: roll your die' : 'Defender: roll your die') : 'Roll dice';
   btn.hidden = s.over;
@@ -684,6 +705,118 @@ function throwDiceImmersive(vals, show){
     requestAnimationFrame(step);
   });
 }
+/* =====================================================================
+   PLAY ANIMATION: the ball goes where the play went, then runners run the bases.
+   ===================================================================== */
+const SVGNS = 'http://www.w3.org/2000/svg';
+const BASE_PT = [[120,172],[178,114],[120,56],[62,114],[120,172]];
+const BATTER_PT = [109,177];
+const BASE_NAME = ['', 'first', 'second', 'third'];
+const pickOne = a => a[Math.floor(Math.random()*a.length)];
+const OF = {left:[46,86,'to left'], lc:[80,50,'to left-center'], cf:[120,36,'to center'], rc:[160,50,'to right-center'], right:[194,86,'to right']};
+const IF = {third:[74,128,'third'], short:[92,94,'short'], second:[148,94,'second'], first:[168,128,'first'], pitcher:[120,128,'the pitcher']};
+/* Decide where the ball went. The same plan drives the sentence and the animation. */
+function planPlay(ev){
+  const id = ev.id;
+  if(ev.robbed){
+    if(id==='HR'){ const k = pickOne(['lc','cf','rc']); return {kind:'catch', to:[OF[k][0], 22], h:46, dur:1300, text:`is robbed of a home run at the wall ${OF[k][2].replace('to ','in ')}!`}; }
+    if(id==='1B'){ const k = pickOne(['short','second','third']); return {kind:'catch', to:IF[k], h:4, dur:420, text:`lines out to ${IF[k][2]}, robbed of a hit.`}; }
+    return {kind:'none', text:'strikes out looking.'};
+  }
+  switch(id){
+    case 'HR': { const x = 40+Math.random()*160; return {kind:'hr', to:[x, -14], h:70, dur:1500, text:`homers ${x<85?'to left':x>155?'to right':'to center'}!`}; }
+    case '3B': { const k = pickOne(['left','right']); return {kind:'hit', to:[OF[k][0]+(k==='left'?-18:18), 74], h:26, dur:900, text:`triples into the ${k}-field corner!`}; }
+    case '2B': { const k = pickOne(['lc','rc','left','right']); return {kind:'hit', to:OF[k], h:22, dur:850, text:`doubles ${OF[k][2]}.`}; }
+    case '1B': { const k = pickOne(['left','cf','right','lc','rc']), t = OF[k]; return {kind:'hit', to:[t[0]*.75+120*.25, t[1]*.6+110*.4], h:8, dur:650, text:`singles ${t[2]}.`}; }
+    case 'BB': return {kind:'none', text:'draws a walk.'};
+    case 'HBP': return {kind:'none', text:'is hit by a pitch.'};
+    case 'K': return {kind:'none', text:pickOne(['strikes out swinging.','strikes out looking.'])};
+    case 'FO': { const k = pickOne(Object.keys(OF)); return {kind:'catch', to:OF[k], h:48, dur:1300, text:`flies out ${OF[k][2]}.`}; }
+    case 'PO': { const k = pickOne(Object.keys(IF)); return {kind:'catch', to:IF[k], h:60, dur:1200, text:`pops out to ${IF[k][2]}.`}; }
+    case 'GO': { const k = pickOne(['third','short','second','pitcher']); return {kind:'ground', to:IF[k], throws:[BASE_PT[1]], dur:500, text:`grounds out to ${IF[k][2]}.`}; }
+    case 'DP': { const k = pickOne(['short','second']); return {kind:'ground', to:IF[k], throws:[BASE_PT[2], BASE_PT[1]], dur:500, text:`grounds into a double play.`}; }
+    case 'TP': return {kind:'ground', to:IF.third, throws:[BASE_PT[3], BASE_PT[2], BASE_PT[1]], dur:380, text:'lines into a triple play!'};
+  }
+  return {kind:'none', text:''};
+}
+function fxLayer(){ let g = $('#fx'); if(!g){ g = document.createElementNS(SVGNS,'g'); g.id = 'fx'; $('#field').appendChild(g); } return g; }
+function tween(ms, fn){
+  return new Promise(done=>{ const t0 = performance.now();
+    const step = now => { const u = Math.min(1, (now-t0)/ms); fn(u); if(u<1) requestAnimationFrame(step); else done(); };
+    requestAnimationFrame(step); });
+}
+const ease = u => u<.5 ? 2*u*u : 1-Math.pow(-2*u+2,2)/2;
+function newBall(){
+  const b = document.createElementNS(SVGNS,'circle'); b.setAttribute('r','2.3'); b.setAttribute('fill','#fff'); b.setAttribute('stroke','#B33'); b.setAttribute('stroke-width','.6');
+  fxLayer().appendChild(b); return b;
+}
+async function flyBall(b, from, to, h, ms, grow){
+  await tween(ms, u=>{
+    const k = h>8 ? u : ease(u), x = from[0]+(to[0]-from[0])*k, y = from[1]+(to[1]-from[1])*k - 4*h*k*(1-k);
+    b.setAttribute('cx', x); b.setAttribute('cy', y); b.setAttribute('r', String(2.3*(1+(grow||h/45)*Math.sin(Math.PI*k))));
+  });
+}
+async function animateBall(plan){
+  if(plan.kind==='none') return;
+  const b = newBall(), home = [120,170];
+  if(plan.kind==='hr'){
+    await flyBall(b, home, plan.to, plan.h, plan.dur, 1.6);
+    b.remove(); return;
+  }
+  if(plan.kind==='ground'){
+    await flyBall(b, home, plan.to, 0, plan.dur);
+    let at = plan.to;
+    for(const t of plan.throws){ await flyBall(b, at, t, 3, 260); at = t; }
+    b.animate([{opacity:1},{opacity:0}], {duration:200}).finished.then(()=>b.remove(), ()=>b.remove());
+    return;
+  }
+  await flyBall(b, home, plan.to, plan.h, plan.dur);
+  if(plan.kind==='catch'){ b.animate([{opacity:1},{opacity:0}], {duration:220}).finished.then(()=>b.remove(), ()=>b.remove()); return; }
+  // A hit: the fielder throws the ball back in.
+  await flyBall(b, plan.to, [120,124], 6, 500);
+  b.remove();
+}
+function newRunner(color, at){
+  const g = document.createElementNS(SVGNS,'g');
+  g.setAttribute('fill', color); g.setAttribute('filter','url(#tokshadow)');
+  g.innerHTML = '<circle r="7" stroke="#fff" stroke-width="2"/><path d="M-4,-1 A4.5,4.5 0 0 1 4,-1 L6.5,0.5 L-4,0.5 Z" fill="#000" opacity=".35"/>';
+  g.setAttribute('transform', `translate(${at[0]} ${at[1]-6})`);
+  fxLayer().appendChild(g); return g;
+}
+async function runBases(m, color, legMs){
+  const pts = m.from===0 ? [BATTER_PT, ...BASE_PT.slice(1, m.to+1)] : BASE_PT.slice(m.from, m.to+1);
+  const g = newRunner(color, pts[0]);
+  for(let i=1;i<pts.length;i++){
+    const a = pts[i-1], c = pts[i];
+    await tween(legMs, u=>{ const k = ease(u), x = a[0]+(c[0]-a[0])*k, y = a[1]+(c[1]-a[1])*k - Math.abs(Math.sin(u*Math.PI*3))*1.6;
+      g.setAttribute('transform', `translate(${x} ${y-6})`); });
+  }
+  if(m.to===4){
+    sfx.play('step');
+    const t = document.createElementNS(SVGNS,'text'); t.setAttribute('class','fxrun'); t.setAttribute('x','134'); t.setAttribute('y','168'); t.textContent = '+1';
+    fxLayer().appendChild(t);
+    t.animate([{transform:'translate(0,0)', opacity:1},{transform:'translate(0,-16px)', opacity:0}], {duration:900, easing:'ease-out'}).finished.then(()=>t.remove(), ()=>t.remove());
+    await g.animate([{opacity:1},{opacity:0}], {duration:260}).finished.catch(()=>{});
+    g.remove(); return null;
+  }
+  return g;
+}
+/* Play out an at-bat on the field. Returns once every runner has arrived. */
+async function animatePlay(ev, before, team, plan){
+  if(reducedMotion() || !ev.moves) return;
+  const field = $('#field'), color = team===0 ? '#1C4E8A' : '#C8402B';
+  field.classList.add('snap');
+  // The runners who move are taken off their bases and run as separate tokens.
+  ev.moves.forEach(m=>{ if(m.from>0) $('#r'+m.from).classList.add('off'); else $('#batter').classList.add('off'); });
+  if(!ev.moves.length && plan.kind!=='none') $('#batter').classList.add('off');
+  const ball = animateBall(plan);
+  if(plan.kind==='hit' || plan.kind==='hr') await sleep(plan.kind==='hr' ? 500 : 250);
+  const legMs = ev.id==='HR' ? 340 : ev.kind==='walk' ? 300 : 260;
+  const runners = await Promise.all(ev.moves.map((m,k)=>sleep(k*60).then(()=>runBases(m, color, legMs))));
+  await ball;
+  await sleep(150);
+  runners.forEach(g=>g && g.remove());
+}
 /* Celebrations: a burst for home runs, confetti for the final out of a win. */
 async function homerBurst(){
   const box = $('.dicebox'); if(!box || reducedMotion() || !box.animate) return;
@@ -710,7 +843,7 @@ function confetti(color){
 /* =====================================================================
    GAME FLOW
    ===================================================================== */
-function describe(ev){
+function describe(ev, plan, team){
   const parts = [];
   if(ev.battle) parts.push(ev.batterWins ? 'The batter wins the battle' : 'The defender wins the battle');
   if(ev.runs) parts.push(`${ev.runs} run${ev.runs>1?'s':''} score${ev.runs>1?'':'s'}`);
@@ -718,7 +851,7 @@ function describe(ev){
   if(ev.outs) parts.push(`${ev.outs} out${ev.outs>1?'s':''}`);
   if(ev.walkoff) parts.push('Walk-off win!');
   else if(ev.halfEnded && !ev.over) parts.push('Three outs: switching sides');
-  return {title:ev.label, sub:parts.join(' · '), tone: ev.kind==='out' ? 'bad' : 'good'};
+  return {title:ev.label, pbp: plan && plan.text ? `${team} ${plan.text}` : '', sub:parts.join(' · '), tone: ev.kind==='out' ? 'bad' : 'good'};
 }
 function sound(ev){
   if(ev.id==='HR' && !ev.robbed) sfx.play('fanfare');
@@ -745,24 +878,41 @@ async function takeTurn(){
       await sleep(reducedMotion()?100:1000);
       p.b = null; ui.busy = false; autosave(); renderAll(); scheduleBot(); return;
     }
+    const before = s.bases.slice(), team = s.half;
     const ev = resolveBattle(s, [...p.rounds, [p.b, v]]);
-    ui.result = describe(ev); sound(ev); if(ev.id==='HR' && !ev.robbed) homerBurst();
+    await playOut(ev, before, team);
     afterPlay(ev);
   } else {
     ui.labels = null; ui.result = null; $('#result').innerHTML = '<span>&nbsp;</span>';
     $$('#dice .dlabel').forEach(e=>e.textContent = '');
     const dice = roll2(rng);
     await animateDice(dice, false);
+    const before = s.bases.slice(), team = s.half;
     const ev = atBat(s, dice);
     if(ev.battle){
       ui.result = {title:'Battle!', sub:`${dice[0]}:${dice[1]} would be a ${ev.label}. The defender gets a say. Batter rolls first.`, tone:'battle'}; sfx.play('battle');
-    } else { ui.result = describe(ev); sound(ev); if(ev.id==='HR') homerBurst(); }
+    } else await playOut(ev, before, team);
     afterPlay(ev);
   }
 }
-function box(sel, r){ const el = $(sel); el.className = 'result '+r.tone; el.innerHTML = `<b>${esc(r.title)}</b><span>${esc(r.sub||'')}</span>`; }
+function box(sel, r){ const el = $(sel); el.className = 'result '+r.tone; el.innerHTML = `<b>${esc(r.title)}</b>${r.pbp?`<span class="pbp">${esc(r.pbp)}</span>`:''}<span>${esc(r.sub||'')}</span>`; }
+/* Show the call, play it out on the field, then update the board. */
+async function playOut(ev, before, team){
+  const plan = planPlay(ev);
+  ui.result = describe(ev, plan, s_name(team)); box('#result', ui.result);
+  sound(ev); if(ev.id==='HR' && !ev.robbed) homerBurst();
+  if(ev.robbed || ev.kind!=='out') logReplace(ev, team, plan);
+  await animatePlay(ev, before, team, plan);
+}
+const s_name = t => ui.state.teams[t].name;
+/* Swap the plain log line for the play-by-play sentence. */
+function logReplace(ev, team, plan){
+  const L = ui.state.log; if(!plan.text) return;
+  for(let i=L.length-1;i>=0 && i>=L.length-3;i--){ if(L[i].includes(': '+ev.label)){ L[i] = L[i].replace(': '+ev.label, ': '+plan.text.replace(/[.!]$/,'')); break; } }
+}
 function afterPlay(ev){
   ui.busy = false; autosave(); renderAll();
+  requestAnimationFrame(()=>requestAnimationFrame(()=>$('#field').classList.remove('snap')));
   const el = $('#result'); el.classList.add('pop');
   if(ui.state.over){ setTimeout(showOver, reducedMotion()?50:900); return; }
   scheduleBot();

@@ -106,6 +106,22 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
     T('robbed third out ends the half inning', () => { const g = game({ outs: 2 }); E.atBat(g, [6, 6]); const ev = E.resolveBattle(g, [[1, 4]]); return ev.halfEnded && g.half === 1; });
     T('a battle walk-off home run wins the game', () => { const g = game({ inning: 9, half: 1, runs: [[0], []] }); E.atBat(g, [1, 1]); E.resolveBattle(g, [[6, 1]]); return g.over && g.walkoff && g.winner === 1; });
 
+    T('moves: bases loaded double', () => { const { ev } = play('2B', { bases: [1, 1, 1] }); return eq(ev.moves, [{ from: 3, to: 4 }, { from: 2, to: 4 }, { from: 1, to: 3 }, { from: 0, to: 2 }]); });
+    T('moves: walk with first and third only forces first', () => { const { ev } = play('BB', { bases: [1, 0, 1] }); return eq(ev.moves, [{ from: 1, to: 2 }, { from: 0, to: 1 }]); });
+    T('moves: outs move nobody', () => { const { ev } = play('GO', { bases: [1, 1, 1] }); return eq(ev.moves, []); });
+    T('moves: robbed hits move nobody', () => { const g = game({ bases: [1, 0, 0] }); E.atBat(g, [1, 1]); const ev = E.resolveBattle(g, [[1, 6]]); return eq(ev.moves, []); });
+    T('moves agree with runs and bases', () => {
+      for (let n = 0; n < 2000; n++) {
+        const b = [0, 1, 2].map(() => Math.random() < .5 ? 1 : 0), ids = Object.keys(E.OUTCOMES), id = ids[n % ids.length];
+        const g = game({ bases: b.slice() }); const ev = E.applyOutcome(g, id, false);
+        if (ev.halfEnded) continue;
+        const scored = ev.moves.filter(m => m.to === 4).length;
+        if (scored !== ev.runs) return id + ' runs ' + ev.runs + ' vs moves ' + scored;
+        const after = b.slice(); ev.moves.forEach(m => { if (m.from) after[m.from - 1] = 0; }); ev.moves.forEach(m => { if (m.to < 4) after[m.to - 1] = 1; });
+        if (JSON.stringify(after) !== JSON.stringify(g.bases)) return id + ' ' + b + ' moved to ' + after + ' but bases are ' + g.bases;
+      }
+      return true;
+    });
     // 300 whole games with random dice
     T('300 random games finish with the right winner', () => {
       for (let n = 0; n < 300; n++) {
@@ -134,7 +150,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 3. Computer against computer, through the interface, to the final out
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.motion', 'off'); localStorage.setItem('dd.seen', '1.3.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.motion', 'off'); localStorage.setItem('dd.seen', '1.4.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="0"][data-bot="1"]');
@@ -154,7 +170,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 4. A person's turns, with animations on, a battle and undo
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.3.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.4.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
@@ -171,6 +187,17 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
   await page.click('#undo');
   const after = await page.evaluate(() => JSON.stringify(__dd.state));
   check(before !== after, 'interface: undo changed nothing');
+  // A home run plays out: ball over the wall, runners around the bases, play-by-play text
+  await page.evaluate(() => { const s = __dd.state; s.bases = [1, 0, 0]; s.outs = 0; s.pending = { key: '1-1', id: 'HR', b: 6, rounds: [] }; renderAll(); });
+  await page.evaluate(() => { window.__fxSeen = 0; new MutationObserver(() => { const n = document.querySelectorAll('#fx > g').length; if (n > window.__fxSeen) window.__fxSeen = n; }).observe(document.querySelector('#field'), { childList: true, subtree: true }); Math.__r = Math.random; let i = 0; Math.random = () => (i++ === 0 ? 0.01 : Math.__r()); });
+  await page.click('#rollbtn');
+  await page.waitForFunction(() => !__dd.ui.busy, null, { timeout: 15000 });
+  await page.evaluate(() => { Math.random = Math.__r; });
+  check(await page.evaluate(() => window.__fxSeen >= 2), 'animation: two runners did not run the bases');
+  check(/homers/.test(await page.innerText('#result')), 'animation: no play-by-play line for the home run');
+  await page.waitForTimeout(1200);
+  check(await page.evaluate(() => document.querySelectorAll('#fx > *').length === 0), 'animation: leftover tokens on the field');
+  check(await page.evaluate(() => !document.querySelector('#field').classList.contains('snap')), 'animation: field stuck without transitions');
   check((await page.locator('#chartbox .cc').count()) === 21, 'chart: expected 21 cells on screen');
   check((await page.locator('#chartbox .mdie').count()) === 42, 'chart: expected dice faces, two per roll');
   check((await page.locator('#chartbox .cc.now').count()) === 1, 'chart: the last roll was not highlighted');
@@ -203,7 +230,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 5. Immersive 3D throw
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.roll', 'immersive'); localStorage.setItem('dd.seen', '1.3.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.roll', 'immersive'); localStorage.setItem('dd.seen', '1.4.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
@@ -230,7 +257,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 6. Installable app: manifest, service worker, offline
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.3.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.4.0'); });
   await page.goto(url);
   const man = await (await page.request.get(url + 'manifest.webmanifest')).json();
   check(man.display === 'standalone' && man.icons.length >= 3, 'manifest incomplete');
@@ -254,7 +281,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
   await page.goto(url);
   // A player from an older version sees What's new on opening
   await page.waitForSelector('#whatsnew[open]');
-  check(/Dice chart on screen/.test(await page.innerText('#wn-body')), "What's new did not list the release");
+  check(/Plays come to life/.test(await page.innerText('#wn-body')), "What's new did not list the release");
   await page.click('#wn-close');
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
