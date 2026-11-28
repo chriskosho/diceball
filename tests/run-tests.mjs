@@ -40,6 +40,7 @@ const fresh = async (opts = {}, init) => {
   const ctx = await browser.newContext(opts);
   // Close the Switch Sides screen on its own, except in the test that checks it.
   await ctx.addInitScript(() => { setInterval(() => { if (window.__keepSides) return; const b = document.querySelector('#sides[open] #sides-go'); if (b) b.click(); }, 80); });
+  await ctx.addInitScript(() => { if (!localStorage.getItem('dd.roll')) localStorage.setItem('dd.roll', 'classic'); });
   if (init) await ctx.addInitScript(init);
   const page = await ctx.newPage(); watch(page); return { ctx, page };
 };
@@ -152,7 +153,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 3. Computer against computer, through the interface, to the final out
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.motion', 'off'); localStorage.setItem('dd.seen', '1.5.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.motion', 'off'); localStorage.setItem('dd.seen', '1.6.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="0"][data-bot="1"]');
@@ -172,7 +173,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 4. A person's turns, with animations on, a battle and undo
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.5.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.6.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
@@ -251,7 +252,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 5. Immersive 3D throw
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.roll', 'immersive'); localStorage.setItem('dd.seen', '1.5.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.roll', 'immersive'); localStorage.setItem('dd.seen', '1.6.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
@@ -276,9 +277,17 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
   await ctx.close();
 }
 
+// Immersive is the default roll for a new player
+{
+  const { ctx, page } = await fresh({}, () => localStorage.removeItem('dd.roll'));
+  await page.goto(url);
+  check(await page.evaluate(() => __dd.ui.rollStyle === 'immersive'), 'Immersive should be the default dice roll');
+  await ctx.close();
+}
+
 // 6. Installable app: manifest, service worker, offline
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.5.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.6.0'); });
   await page.goto(url);
   const man = await (await page.request.get(url + 'manifest.webmanifest')).json();
   check(man.display === 'standalone' && man.icons.length >= 3, 'manifest incomplete');
@@ -302,7 +311,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
   await page.goto(url);
   // A player from an older version sees What's new on opening
   await page.waitForSelector('#whatsnew[open]');
-  check(/Big moments/.test(await page.innerText('#wn-body')), "What's new did not list the release");
+  check(/Cleaner big moments/.test(await page.innerText('#wn-body')), "What's new did not list the release");
   await page.click('#wn-close');
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
