@@ -38,6 +38,8 @@ const watch = page => {
 };
 const fresh = async (opts = {}, init) => {
   const ctx = await browser.newContext(opts);
+  // Close the Switch Sides screen on its own, except in the test that checks it.
+  await ctx.addInitScript(() => { setInterval(() => { if (window.__keepSides) return; const b = document.querySelector('#sides[open] #sides-go'); if (b) b.click(); }, 80); });
   if (init) await ctx.addInitScript(init);
   const page = await ctx.newPage(); watch(page); return { ctx, page };
 };
@@ -150,7 +152,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 3. Computer against computer, through the interface, to the final out
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.motion', 'off'); localStorage.setItem('dd.seen', '1.4.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.motion', 'off'); localStorage.setItem('dd.seen', '1.5.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="0"][data-bot="1"]');
@@ -170,7 +172,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 4. A person's turns, with animations on, a battle and undo
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.4.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.5.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
@@ -215,6 +217,25 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
     await page.waitForFunction(() => !__dd.ui.busy, null, { timeout: 15000 });
   }
   check(await page.evaluate(() => !__dd.state.pending), 'battle: did not resolve');
+  // Three outs: Switch Sides waits for Continue so the device can be passed
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { window.__keepSides = true; const s = __dd.state; s.pending = null; s.outs = 2; s.teams[0].bot = false; s.teams[1].bot = false; window.__half = s.half; renderAll(); Math.__r = Math.random; const seq = [0.2, 0.5]; Math.random = () => seq.length ? seq.shift() : Math.__r(); });
+  await page.click('#rollbtn');
+  await page.waitForFunction(() => !__dd.ui.busy, null, { timeout: 20000 });
+  await page.evaluate(() => { Math.random = Math.__r; });
+  await page.waitForSelector('#sides[open]');
+  check(/Pass the device/.test(await page.innerText('#sides-body')), 'switch sides: no pass-the-device prompt');
+  await page.waitForTimeout(2700);
+  check(await page.evaluate(() => document.querySelector('#sides').open), 'switch sides: closed by itself in a two-player game');
+  await page.click('#sides-go');
+  check(await page.evaluate(() => !document.querySelector('#sides').open && __dd.state.half !== window.__half), 'switch sides: Continue did not hand over');
+  await page.evaluate(() => { window.__keepSides = false; });
+  console.log('Switch sides: waits for Continue, then hands over');
+  // The sound and menu buttons use icons, and sound toggles the speaker
+  check(await page.evaluate(() => !!document.querySelector('#snd svg') && !!document.querySelector('#gear svg')), 'toolbar: sound and menu should be icons');
+  const on = await page.getAttribute('#snd-icon', 'd'); await page.click('#snd');
+  check((await page.getAttribute('#snd-icon', 'd')) !== on && (await page.getAttribute('#snd', 'aria-pressed')) === 'false', 'toolbar: sound icon did not change when muted');
+  await page.click('#snd');
   // Menu and chart open
   await page.click('#gear'); await page.waitForSelector('#menu[open]');
   await page.click('#m-chart'); await page.waitForSelector('#chartdlg[open]');
@@ -230,7 +251,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 5. Immersive 3D throw
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.roll', 'immersive'); localStorage.setItem('dd.seen', '1.4.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.roll', 'immersive'); localStorage.setItem('dd.seen', '1.5.0'); });
   await page.goto(url);
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
@@ -257,7 +278,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
 
 // 6. Installable app: manifest, service worker, offline
 {
-  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.4.0'); });
+  const { ctx, page } = await fresh({ viewport: { width: 420, height: 900 } }, () => { localStorage.setItem('dd.seen', '1.5.0'); });
   await page.goto(url);
   const man = await (await page.request.get(url + 'manifest.webmanifest')).json();
   check(man.display === 'standalone' && man.icons.length >= 3, 'manifest incomplete');
@@ -281,7 +302,7 @@ const check = (cond, msg) => { if (!cond) problems.push(msg); };
   await page.goto(url);
   // A player from an older version sees What's new on opening
   await page.waitForSelector('#whatsnew[open]');
-  check(/Plays come to life/.test(await page.innerText('#wn-body')), "What's new did not list the release");
+  check(/Big moments/.test(await page.innerText('#wn-body')), "What's new did not list the release");
   await page.click('#wn-close');
   await page.waitForSelector('#setup[open]');
   await page.click('[data-pt="1"][data-bot="0"]');
