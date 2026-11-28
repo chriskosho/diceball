@@ -47,6 +47,10 @@ button{font:inherit;color:inherit}
 .bar{display:flex;align-items:center;gap:6px}
 .bar h1{font-family:var(--cond);font-stretch:condensed;font-size:1.5rem;margin:0;flex:1;letter-spacing:.01em}
 .bar .btn{min-width:42px;min-height:40px}
+.bar .btn svg{width:1.15em;height:1.15em;fill:currentColor;flex:none}
+.bar .btn.icon{padding:.35em .5em;display:inline-flex;align-items:center;justify-content:center}
+.bar .btn.icon svg{width:1.4em;height:1.4em}
+.bar .btn.icon[aria-pressed=true]{background:transparent;color:var(--ink)}
 /* scoreboard */
 .card{background:var(--sheet);border:2px solid var(--line);border-radius:10px;overflow:hidden}
 #score{background:#163A28;border-color:#0F2A1C;color:#F4EBD0}
@@ -146,6 +150,44 @@ input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(-
 .fxrun{font:700 9px Arial,sans-serif;fill:#F3D23B;stroke:#123623;stroke-width:2.2px;paint-order:stroke;text-anchor:middle}
 #field.snap .runner{transition:none}
 .result span.pbp{color:var(--ink);font-size:1rem;display:block;margin-bottom:2px}
+.fxstage{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4;line-height:1}
+.stamp{position:absolute;left:50%;top:46%;font-family:var(--cond);font-stretch:condensed;font-weight:900;font-size:clamp(2.2rem,13vw,4.2rem);color:#fff;-webkit-text-stroke:2px #123623;text-shadow:0 4px 0 #123623,0 8px 18px rgba(0,0,0,.5);white-space:nowrap;letter-spacing:.02em;line-height:1}
+.spark{position:absolute;width:5px;height:5px;border-radius:50%;margin:-2.5px 0 0 -2.5px}
+.rocket{position:absolute;width:3px;height:12px;margin-left:-1.5px;border-radius:2px;background:linear-gradient(#fff,rgba(243,210,59,0))}
+.fxlayer{position:absolute;inset:0}
+.dimmer{background:rgba(5,15,10,.6)} .flashw{background:#fff}
+.glow{background:radial-gradient(circle at 50% 86%,rgba(243,210,59,.85),rgba(243,210,59,0) 72%)}
+.mob{position:absolute;width:20px;height:20px;border-radius:50%;border:2.5px solid #fff;margin:-10px 0 0 -10px;box-shadow:0 2px 4px rgba(0,0,0,.4)}
+.replay{position:absolute;right:8px;bottom:8px;background:#C8402B;color:#fff;font:700 .8rem var(--cond);padding:4px 8px;border-radius:4px;letter-spacing:.12em}
+.bolt{position:absolute;left:50%;top:0;width:60%;height:100%;transform:translateX(-50%)}
+.outs i.flash{animation:outflash .45s 2}
+.outs i.third{animation:outflash .35s 3;box-shadow:0 0 10px 3px rgba(229,56,43,.8)}
+@keyframes outflash{50%{transform:scale(1.55);box-shadow:0 0 0 5px rgba(229,56,43,.45)}}
+.line td.bump{animation:bump .9s}
+@keyframes bump{0%,40%{background:#F3D23B;color:#163A28}}
+.line td.lit{animation:lit .9s}
+@keyframes lit{0%{background:#fff}}
+.line tr.winrow td{animation:winflood 1.4s forwards}
+@keyframes winflood{to{background:rgba(243,210,59,.22)}}
+.dice.versus{gap:8px}
+.vs{font-family:var(--cond);font-weight:900;font-size:1.4rem;color:var(--home);align-self:center;margin-top:-1.1em}
+.dice.intro .dicewrap:first-child{animation:slideL .55s cubic-bezier(.3,1.5,.5,1)}
+.dice.intro .dicewrap:last-child{animation:slideR .55s cubic-bezier(.3,1.5,.5,1)}
+.dice.intro .vs{animation:pop .4s .25s both}
+@keyframes slideL{from{transform:translateX(-90px);opacity:0}} @keyframes slideR{from{transform:translateX(90px);opacity:0}}
+.die.win{box-shadow:0 0 0 4px #F3D23B,0 0 18px 6px rgba(243,210,59,.7);border-color:#B88B00;transition:box-shadow .3s}
+.die.lose{opacity:.35;filter:grayscale(1);transform:rotate(-10deg) scale(.88);transition:all .4s}
+#sides{text-align:center;overflow:hidden}
+#sides .mb{padding-top:0}
+#sides .wipe{height:12px;margin:0 -22px 18px;background:var(--c);transform-origin:left;animation:wipe .7s ease-out}
+@keyframes wipe{from{transform:scaleX(0)}}
+#sides .eyebrow{font-family:var(--cond);font-weight:800;color:var(--bad);letter-spacing:.14em;text-transform:uppercase;margin:0}
+#sides h2{padding:0;font-size:2.5rem;margin:.1em 0 .25em}
+#sides .tok{display:inline-block;width:48px;height:48px;border-radius:50%;background:var(--c);border:4px solid #fff;box-shadow:0 3px 8px rgba(0,0,0,.35);animation:tokin .8s cubic-bezier(.3,1.6,.5,1)}
+@keyframes tokin{from{transform:translateX(-140px) scale(.4);opacity:0}}
+#sides .sc{font-family:var(--cond);font-size:1.3rem;font-weight:700;margin:.5em 0 .2em}
+#sides .row-btns{justify-content:center}
+#sides-go{font-size:1.25rem;min-width:10em}
 .confetti{position:fixed;z-index:2500;pointer-events:none;border-radius:2px}
 </style>
 </head>
@@ -155,8 +197,8 @@ input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(-
     <h1>Diceball</h1>
     <button class="btn small" id="undo" aria-label="Undo last roll" title="Undo (U)">↶ Undo</button>
     <button class="btn small" id="fs" aria-label="Full screen" title="Full screen">⛶</button>
-    <button class="btn small" id="snd" aria-label="Sound on" title="Sound">🔊</button>
-    <button class="btn small" id="gear" aria-label="Menu" title="Menu">⚙</button>
+    <button class="btn small icon" id="snd" aria-label="Sound is on. Turn sound off" title="Sound is on" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="snd-icon" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg></button>
+    <button class="btn small icon" id="gear" aria-label="Menu" title="Menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></button>
   </div>
   <section class="card line-wrap" id="score" aria-label="Scoreboard"></section>
   <section class="card fieldbox" aria-label="Field">
@@ -195,6 +237,7 @@ input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(-
     </svg>
     <div class="hud" id="hud"></div>
     <div class="outs" id="outs"></div>
+    <div class="fxstage" id="fxstage" aria-hidden="true"></div>
   </section>
   <section class="card panel" aria-label="At bat">
     <div class="who" id="who"></div>
@@ -212,6 +255,7 @@ input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(-
 <dialog id="menu"><button class="xbtn" data-close aria-label="Close">×</button><div class="mb" id="menu-body"></div></dialog>
 <dialog id="chartdlg"><button class="xbtn" data-close aria-label="Close">×</button><div class="mb" id="chart-body"></div></dialog>
 <dialog id="over"><div class="mb" id="over-body"></div></dialog>
+<dialog id="sides" aria-labelledby="sides-title"><div class="mb" id="sides-body"></div></dialog>
 <dialog id="confirm"><div class="mb" id="confirm-body"></div></dialog>
 <dialog id="whatsnew" aria-labelledby="wn-title"><div class="mb" id="wn-body"></div></dialog>
 
@@ -222,8 +266,15 @@ input[type=text],select{font:inherit;padding:.55em .7em;border:1.5px solid var(-
    entry (newest first). The deploy step publishes the number as version.json, and
    running copies check it to know when to update themselves.
    ===================================================================== */
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 const RELEASES = [
+  {version:'1.5.0', date:'2026-11-27', title:'Big moments', changes:[
+    'Switching sides: after three outs, a Switching Sides screen shows the score and who bats next. In a two-player game it waits for Continue, so you can pass the device.',
+    'Home runs set off fireworks over the wall. A grand slam shakes the screen. Walk-offs light the field gold while the team mobs the plate.',
+    'Battles open with lightning and a dimmed field. Ties shake the dice, and the winning die glows.',
+    'Strikeouts stamp a big K, robbed home runs get a glove at the wall, triple plays get a replay, and three runs in an inning is a Rally.',
+    'Out lights flash, the scoreboard lights up when runs score and when the inning changes, and phones buzz for the biggest moments.',
+    'The sound and menu buttons now use the same icons as Propertyopoly.']},
   {version:'1.4.0', date:'2026-11-27', title:'Plays come to life', changes:[
     'The ball now goes where the play went: line drives into the gaps, fly balls caught in the outfield, grounders thrown across to first, and home runs that clear the wall.',
     'Runners run the bases one at a time, and each run that scores pops a +1 at the plate.',
@@ -452,6 +503,11 @@ const sfx = {
     if(ui.muted) return;
     switch(name){
       case 'dice': for(let k=0;k<6;k++) this.noise(0.035, {when:k*0.065+Math.random()*0.02, freq:1500+Math.random()*1500, q:3, gain:0.35}); break;
+      case 'pop': this.noise(0.28, {freq:900, q:.8, gain:.4}); this.tone(1700, 0.16, {gain:.04, slide:500}); break;
+      case 'crack': this.noise(0.4, {freq:2600, q:.5, gain:.55}); this.tone(70, 0.45, {gain:.25, slide:38}); break;
+      case 'whoosh': this.noise(0.45, {freq:600, q:.6, gain:.3}); break;
+      case 'stamp': this.tone(120, 0.14, {gain:.22, slide:55}); this.noise(.07, {freq:500, gain:.3}); break;
+      case 'cheer': for(let k=0;k<10;k++) this.noise(0.7, {when:k*0.07, freq:1000+Math.random()*1800, q:.7, gain:.1}); break;
       case 'step': this.tone(940, 0.045, {type:'triangle', gain:0.05}); break;
       case 'thud': this.tone(95, 0.18, {gain:0.22, slide:48}); this.noise(0.07, {freq:300, q:1.5, gain:0.35}); break;
       case 'hit': this.noise(0.05, {freq:1200, q:4, gain:0.6}); this.tone(660, 0.12, {gain:0.1}); this.tone(990, 0.2, {when:0.08, gain:0.1}); break;
@@ -483,7 +539,7 @@ function renderScore(){
       if(t===1 && s.homeSkipped && inn===s.inning) v = 'X';
       return `<td class="${cur?'cur':''}">${v}</td>`;
     }).join('');
-    return `<tr class="${!s.over && s.half===t?'batting':''}"><td class="nm"><span class="sw" style="background:${teamColor(t)}"></span>${esc(s.teams[t].name)}</td>${cells}<td class="tot">${teamRuns(s,t)}</td><td class="tot" style="border-left:1px solid rgba(255,255,255,.12)">${s.hits[t]}</td></tr>`;
+    return `<tr class="${!s.over && s.half===t?'batting':''}${s.over && s.winner===t?' winrow':''}"><td class="nm"><span class="sw" style="background:${teamColor(t)}"></span>${esc(s.teams[t].name)}</td>${cells}<td class="tot">${teamRuns(s,t)}</td><td class="tot" style="border-left:1px solid rgba(255,255,255,.12)">${s.hits[t]}</td></tr>`;
   };
   $('#score').innerHTML = `<table class="line"><thead><tr><th class="nm"></th>${head}<th class="tot">R</th><th>H</th></tr></thead><tbody>${row(0)}${row(1)}</tbody></table>`;
 }
@@ -510,7 +566,10 @@ function renderPanel(){
   if(!ui.busy){
     const lab = s.pending ? ['Batter','Defender'] : (ui.labels || ['','']);
     const vals = s.pending ? [s.pending.b, null] : s.dice;
-    $('#dice').innerHTML = [0,1].map(k=>`<div class="dicewrap"><span class="die" aria-label="${vals[k]==null ? 'Die not rolled yet' : 'Die showing '+vals[k]}">${pips(vals[k])}</span><span class="dlabel">${lab[k]}</span></div>`).join('');
+    $('#dice').innerHTML = [0,1].map(k=>`<div class="dicewrap"><span class="die" aria-label="${vals[k]==null ? 'Die not rolled yet' : 'Die showing '+vals[k]}">${pips(vals[k])}</span><span class="dlabel">${lab[k]}</span></div>`).join(s.pending ? '<span class="vs">VS</span>' : '');
+    $('#dice').className = 'dice' + (s.pending ? ' versus' : '') + (s.pending && ui.battleIntro && !reducedMotion() ? ' intro' : '');
+    ui.battleIntro = false;
+    if(!s.pending && ui.battleWin!=null){ const dd = $$('#dice .die'); dd[ui.battleWin].classList.add('win'); dd[1-ui.battleWin].classList.add('lose'); }
   }
   const r = ui.result, box = $('#result');
   box.className = 'result' + (r ? ' '+r.tone : '');
@@ -535,7 +594,8 @@ function renderLog(){
   const el = $('#log'); el.hidden = !ui.showLog;
   if(ui.showLog) el.innerHTML = ui.state.log.slice().reverse().map(l=>`<div>${esc(l)}</div>`).join('') || '<div>No plays yet.</div>';
 }
-function renderAll(){ renderScore(); renderField(); renderPanel(); renderChart(); renderLog(); $('#snd').setAttribute('aria-label', ui.muted ? 'Sound off' : 'Sound on'); $('#snd').textContent = ui.muted ? '🔇' : '🔊'; }
+function renderAll(){ renderScore(); renderField(); renderPanel(); renderChart(); renderLog(); const sb = $('#snd'); sb.setAttribute('aria-label', ui.muted ? 'Sound is off. Turn sound on' : 'Sound is on. Turn sound off'); sb.title = ui.muted ? 'Sound is off' : 'Sound is on'; sb.setAttribute('aria-pressed', String(!ui.muted));
+  $('#snd-icon').setAttribute('d', ui.muted ? 'M16.5 12A4.5 4.5 0 0 0 14 7.97v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51A8.796 8.796 0 0 0 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06a8.99 8.99 0 0 0 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z' : 'M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z'); }
 
 /* =====================================================================
    DICE ANIMATION (the same tossed and Immersive 3D rolls as Propertyopoly)
@@ -719,7 +779,7 @@ const IF = {third:[74,128,'third'], short:[92,94,'short'], second:[148,94,'secon
 function planPlay(ev){
   const id = ev.id;
   if(ev.robbed){
-    if(id==='HR'){ const k = pickOne(['lc','cf','rc']); return {kind:'catch', to:[OF[k][0], 22], h:46, dur:1300, text:`is robbed of a home run at the wall ${OF[k][2].replace('to ','in ')}!`}; }
+    if(id==='HR'){ const k = pickOne(['lc','cf','rc']); return {kind:'catch', to:[OF[k][0], 22], h:46, dur:1300, glove:true, text:`is robbed of a home run at the wall ${OF[k][2].replace('to ','in ')}!`}; }
     if(id==='1B'){ const k = pickOne(['short','second','third']); return {kind:'catch', to:IF[k], h:4, dur:420, text:`lines out to ${IF[k][2]}, robbed of a hit.`}; }
     return {kind:'none', text:'strikes out looking.'};
   }
@@ -766,10 +826,11 @@ async function animateBall(plan){
   if(plan.kind==='ground'){
     await flyBall(b, home, plan.to, 0, plan.dur);
     let at = plan.to;
-    for(const t of plan.throws){ await flyBall(b, at, t, 3, 260); at = t; }
+    for(const t of plan.throws){ await flyBall(b, at, t, 3, plan.throwMs||260); at = t; }
     b.animate([{opacity:1},{opacity:0}], {duration:200}).finished.then(()=>b.remove(), ()=>b.remove());
     return;
   }
+  if(plan.glove) setTimeout(()=>glove(plan.to), plan.dur*0.55);
   await flyBall(b, home, plan.to, plan.h, plan.dur);
   if(plan.kind==='catch'){ b.animate([{opacity:1},{opacity:0}], {duration:220}).finished.then(()=>b.remove(), ()=>b.remove()); return; }
   // A hit: the fielder throws the ball back in.
@@ -792,6 +853,7 @@ async function runBases(m, color, legMs){
       g.setAttribute('transform', `translate(${x} ${y-6})`); });
   }
   if(m.to===4){
+    await tween(260, u=>g.setAttribute('transform', `translate(120 ${166-Math.sin(Math.PI*u)*7})`));
     sfx.play('step');
     const t = document.createElementNS(SVGNS,'text'); t.setAttribute('class','fxrun'); t.setAttribute('x','134'); t.setAttribute('y','168'); t.textContent = '+1';
     fxLayer().appendChild(t);
@@ -841,6 +903,122 @@ function confetti(color){
 }
 
 /* =====================================================================
+   CELEBRATIONS AND BIG MOMENTS. All of them are skipped when Animations is off.
+   ===================================================================== */
+const stage = () => $('#fxstage');
+const buzz = pat => { try{ if(!reducedMotion() && navigator.vibrate) navigator.vibrate(pat); }catch(e){} };
+const teamHex = t => t===0 ? '#3D7CC9' : '#E0553E';
+function layer(cls){ const d = document.createElement('div'); d.className = 'fxlayer '+cls; stage().appendChild(d); return d; }
+const fadeOut = (el, ms) => el.animate([{opacity:1},{opacity:0}], {duration:ms, fill:'forwards'}).finished.catch(()=>{}).then(()=>el.remove());
+/* Big lettering that slams onto the field. */
+function stamp(text, o={}){
+  if(reducedMotion()) return Promise.resolve();
+  const el = document.createElement('div'); el.className = 'stamp'; el.textContent = text;
+  if(o.color) el.style.color = o.color; if(o.size) el.style.fontSize = o.size;
+  stage().appendChild(el); sfx.play('stamp');
+  const f = o.flip ? ' scaleX(-1)' : '', T = k => `translate(-50%,-50%) scale(${k})${f}`;
+  return el.animate([{transform:T(2.6), opacity:0},{transform:T(.92), opacity:1, offset:.14},{transform:T(1), opacity:1, offset:.22},
+    {transform:T(1), opacity:1, offset:.8},{transform:T(1.08), opacity:0}], {duration:o.ms||1300, easing:'ease-out', fill:'forwards'})
+    .finished.catch(()=>{}).then(()=>el.remove());
+}
+function shake(){ if(reducedMotion()) return; $('#app').animate([0,-7,6,-5,4,-2,0].map((x,i)=>({transform:`translate(${x}px,${i%2?3:-3}px)`})), {duration:520}); }
+/* Fireworks over the outfield wall. */
+function fireworks(n, colors){
+  if(reducedMotion()) return;
+  for(let i=0;i<n;i++) setTimeout(()=>{
+    const st = stage(); if(!st) return;
+    const x = 12+Math.random()*76, y = 8+Math.random()*26;
+    const r = document.createElement('i'); r.className = 'rocket'; r.style.left = x+'%'; r.style.top = y+'%'; st.appendChild(r);
+    const H = st.clientHeight;
+    r.animate([{transform:`translateY(${H*(1-y/100)*0.75}px)`, opacity:1},{transform:'translateY(0)', opacity:.9}], {duration:380, easing:'ease-out'}).finished.catch(()=>{}).then(()=>{
+      r.remove(); sfx.play('pop');
+      for(let k=0;k<28;k++){
+        const p = document.createElement('i'); p.className = 'spark'; p.style.left = x+'%'; p.style.top = y+'%';
+        p.style.background = colors[k%colors.length]; p.style.boxShadow = `0 0 6px ${colors[k%colors.length]}`; st.appendChild(p);
+        const a = k/28*Math.PI*2 + Math.random()*.2, d = 34+Math.random()*30, dx = Math.cos(a)*d, dy = Math.sin(a)*d;
+        p.animate([{transform:'translate(0,0) scale(1.3)', opacity:1},{transform:`translate(${dx}px,${dy}px) scale(1)`, opacity:1, offset:.55},
+          {transform:`translate(${dx*1.1}px,${dy+30}px) scale(.3)`, opacity:0}], {duration:1150, easing:'cubic-bezier(.15,.75,.3,1)'}).finished.catch(()=>{}).then(()=>p.remove());
+      }
+    });
+  }, i*280);
+}
+/* Battle intro: the field dims, lightning cracks, BATTLE slams in. */
+async function battleIntro(){
+  if(reducedMotion()) return;
+  const dim = layer('dimmer'); dim.animate([{opacity:0},{opacity:1}], {duration:200, fill:'forwards'});
+  const bolt = document.createElement('div');
+  bolt.innerHTML = '<svg class="bolt" viewBox="0 0 60 100" preserveAspectRatio="none"><polyline points="34,0 22,38 36,42 18,100" fill="none" stroke="#F3D23B" stroke-width="3.5" stroke-linejoin="bevel"/></svg>';
+  const b = bolt.firstChild; stage().appendChild(b);
+  const fl = layer('flashw'); sfx.play('crack'); buzz(30);
+  fl.animate([{opacity:.85},{opacity:0}], {duration:260, fill:'forwards'}).finished.catch(()=>{}).then(()=>fl.remove());
+  b.animate([{opacity:1},{opacity:0},{opacity:1},{opacity:0}], {duration:420, fill:'forwards'}).finished.catch(()=>{}).then(()=>b.remove());
+  await stamp('BATTLE!', {color:'#F3D23B', ms:1100});
+  fadeOut(dim, 220);
+}
+function tieFx(){
+  if(reducedMotion()) return;
+  $$('#dice .die').forEach((d,k)=>d.animate([{transform:'none'},{transform:`translateX(${k?6:-6}px) rotate(${k?7:-7}deg)`},{transform:`translateX(${k?-6:6}px) rotate(${k?-7:7}deg)`},{transform:'none'}], {duration:170, iterations:3}));
+  stamp('TIE!', {color:'#fff', ms:950});
+}
+/* Walk-off: the field glows gold and the team mobs the runner at the plate. */
+async function walkoffParty(team){
+  if(reducedMotion()) return;
+  sfx.play('cheer'); buzz([80,50,80,50,200]);
+  const g = layer('glow'); g.animate([{opacity:0},{opacity:1},{opacity:.45},{opacity:1},{opacity:.45},{opacity:1}], {duration:2400, fill:'forwards'});
+  const st = stage(), W = st.clientWidth, H = st.clientHeight;
+  for(let k=0;k<7;k++){
+    const m = document.createElement('i'); m.className = 'mob'; m.style.background = team===0 ? '#1C4E8A' : '#C8402B';
+    m.style.left = '50%'; m.style.top = '86%'; st.appendChild(m);
+    const sx = (k<4 ? -1 : 1)*(0.18+Math.random()*0.3)*W, sy = -(0.15+Math.random()*0.45)*H, jx = (Math.random()-.5)*28, jy = (Math.random()-.5)*14;
+    m.animate([{transform:`translate(${sx}px,${sy}px)`, opacity:0},{transform:`translate(${jx}px,${jy}px)`, opacity:1, offset:.35},
+      {transform:`translate(${jx}px,${jy-10}px)`, offset:.47},{transform:`translate(${jx}px,${jy}px)`, offset:.59},
+      {transform:`translate(${jx}px,${jy-10}px)`, offset:.71},{transform:`translate(${jx}px,${jy}px)`, offset:.83, opacity:1},{transform:`translate(${jx}px,${jy}px)`, opacity:0}],
+      {duration:2600, delay:k*70, easing:'ease-out'}).finished.catch(()=>{}).then(()=>m.remove());
+  }
+  await stamp('WALK-OFF!', {color:'#F3D23B', ms:2000});
+  fadeOut(g, 400);
+}
+/* Out lights: the new outs flash, and the third one pulses red. */
+async function flashOuts(prev, add){
+  if(reducedMotion()) return;
+  const n = Math.min(3, prev+add);
+  $('#outs').innerHTML = `Outs ${[0,1,2].map(i=>`<i class="${i<n?'on':''}${i>=prev&&i<n ? (n===3?' third':' flash') : ''}"></i>`).join('')}`;
+  await sleep(n===3 ? 750 : 450);
+}
+function glove(at){
+  const t = document.createElementNS(SVGNS,'text'); t.setAttribute('x', at[0]); t.setAttribute('y', 30); t.setAttribute('font-size','15'); t.setAttribute('text-anchor','middle'); t.textContent = '🧤';
+  fxLayer().appendChild(t);
+  t.animate([{transform:'translateY(10px)', opacity:0},{transform:'translateY(-3px)', opacity:1, offset:.35},{transform:'translateY(-3px)', opacity:1, offset:.85},{opacity:0}], {duration:1400}).finished.catch(()=>{}).then(()=>t.remove());
+}
+/* After the sides switch: the inning tag and the new inning on the scoreboard light up. */
+function flashInning(){
+  if(reducedMotion() || !ui.state) return;
+  $('#hud').animate([{transform:'scale(1.18)', background:'rgba(243,210,59,.9)'},{transform:'scale(1)'}], {duration:700, easing:'ease-out'});
+  const c = $('#score td.cur'); if(c){ c.classList.remove('lit'); void c.offsetWidth; c.classList.add('lit'); }
+}
+/* Three outs: the Switch Sides screen. In a two-person game it waits for Continue,
+   so the device can be passed to the other player. Otherwise it closes by itself. */
+function showSides(){
+  const s = ui.state, hot = !s.teams[0].bot && !s.teams[1].bot;
+  if(!hot && reducedMotion()) return;
+  const t = s.half, nm = s.teams[t].name, c = teamColor(t);
+  const when = t===1 ? `Middle of the ${ordinal(s.inning)}` : `End of the ${ordinal(s.inning-1)}`;
+  const msg = hot ? `Pass the device to the ${esc(nm)} player.` : s.teams[t].bot ? `${esc(nm)} comes up to bat.` : `${esc(nm)}, you’re up.`;
+  $('#sides-body').innerHTML = `<div class="wipe" style="--c:${c}"></div>
+    <p class="eyebrow">Three outs</p><h2 id="sides-title">Switching sides</h2>
+    <span class="tok" style="--c:${c}"></span>
+    <p class="sc">${esc(s.teams[0].name)} ${teamRuns(s,0)} · ${esc(s.teams[1].name)} ${teamRuns(s,1)}</p>
+    <p class="hint">${when}</p>
+    <p>${msg}</p>
+    <div class="row-btns"><button class="btn primary" id="sides-go" autofocus>Continue</button></div>`;
+  const d = openDlg('#sides'); sfx.play('whoosh');
+  $('#sides-go', d).addEventListener('click', ()=>d.close());
+  clearTimeout(ui.sidesTimer);
+  if(!hot) ui.sidesTimer = setTimeout(()=>{ if(d.open) d.close(); }, reducedMotion() ? 900 : 2300);
+}
+const snapOf = s => ({bases:s.bases.slice(), outs:s.outs, inning:s.inning, half:s.half, inRuns:s.runs[s.half][s.inning-1]||0});
+
+/* =====================================================================
    GAME FLOW
    ===================================================================== */
 function describe(ev, plan, team){
@@ -874,23 +1052,26 @@ async function takeTurn(){
     await animateDice([v], false, 1);
     if(v===p.b){
       p.rounds.push([p.b, v]);
-      ui.result = {title:'Tie!', sub:'Both roll again.', tone:'battle'}; box('#result', ui.result);
+      ui.result = {title:'Tie!', sub:'Both roll again.', tone:'battle'}; box('#result', ui.result); tieFx();
       await sleep(reducedMotion()?100:1000);
       p.b = null; ui.busy = false; autosave(); renderAll(); scheduleBot(); return;
     }
-    const before = s.bases.slice(), team = s.half;
+    ui.battleWin = p.b>v ? 0 : 1; ui.labels = ['Batter','Defender'];
+    { const dd = $$('#dice .die'); if(dd.length===2){ dd[ui.battleWin].classList.add('win'); dd[1-ui.battleWin].classList.add('lose'); } }
+    await sleep(reducedMotion() ? 0 : 650);
+    const before = snapOf(s), team = s.half;
     const ev = resolveBattle(s, [...p.rounds, [p.b, v]]);
     await playOut(ev, before, team);
     afterPlay(ev);
   } else {
-    ui.labels = null; ui.result = null; $('#result').innerHTML = '<span>&nbsp;</span>';
+    ui.labels = null; ui.battleWin = null; ui.result = null; $('#result').innerHTML = '<span>&nbsp;</span>';
     $$('#dice .dlabel').forEach(e=>e.textContent = '');
     const dice = roll2(rng);
     await animateDice(dice, false);
-    const before = s.bases.slice(), team = s.half;
+    const before = snapOf(s), team = s.half;
     const ev = atBat(s, dice);
     if(ev.battle){
-      ui.result = {title:'Battle!', sub:`${dice[0]}:${dice[1]} would be a ${ev.label}. The defender gets a say. Batter rolls first.`, tone:'battle'}; sfx.play('battle');
+      ui.result = {title:'Battle!', sub:`${dice[0]}:${dice[1]} would be a ${ev.label}. The defender gets a say. Batter rolls first.`, tone:'battle'}; sfx.play('battle'); box('#result', ui.result); ui.battleIntro = true; await battleIntro();
     } else await playOut(ev, before, team);
     afterPlay(ev);
   }
@@ -898,11 +1079,24 @@ async function takeTurn(){
 function box(sel, r){ const el = $(sel); el.className = 'result '+r.tone; el.innerHTML = `<b>${esc(r.title)}</b>${r.pbp?`<span class="pbp">${esc(r.pbp)}</span>`:''}<span>${esc(r.sub||'')}</span>`; }
 /* Show the call, play it out on the field, then update the board. */
 async function playOut(ev, before, team){
-  const plan = planPlay(ev);
+  const plan = planPlay(ev), homer = ev.id==='HR' && !ev.robbed, slam = homer && ev.runs===4;
   ui.result = describe(ev, plan, s_name(team)); box('#result', ui.result);
-  sound(ev); if(ev.id==='HR' && !ev.robbed) homerBurst();
+  sound(ev);
+  if(homer){ buzz(slam ? [60,40,60,40,140] : [40,60,90]); setTimeout(()=>{ fireworks(slam ? 8 : 4, [teamHex(team), '#F3D23B', '#FFFFFF']); if(slam) shake(); }, 950); }
+  if((ev.id==='K' && !ev.robbed) || (ev.robbed && ev.id==='BB')) stamp('K', {color:'#E5382B', size:'clamp(4rem,26vw,7rem)', flip:ev.robbed});
   if(ev.robbed || ev.kind!=='out') logReplace(ev, team, plan);
   await animatePlay(ev, before, team, plan);
+  if(slam) await stamp('GRAND SLAM!', {color:'#F3D23B'});
+  if(ev.robbed && ev.id==='HR') await stamp('ROBBED!', {color:'#E5382B'});
+  if(ev.id==='TP' && !reducedMotion()){
+    const tag = document.createElement('div'); tag.className = 'replay'; tag.textContent = 'REPLAY'; stage().appendChild(tag);
+    await animateBall({...plan, dur:plan.dur*2.4, throwMs:700}); tag.remove();
+    await stamp('TRIPLE PLAY!', {color:'#F3D23B'});
+  }
+  const inRuns = before.inRuns + ev.runs;
+  if(ev.runs && before.inRuns<3 && inRuns>=3 && !ev.walkoff) await stamp('RALLY!', {color:'#F3D23B', ms:1100});
+  ui.scored = ev.runs ? {t:team, inn:before.inning} : null;
+  if(ev.outs) await flashOuts(before.outs, ev.outs);
 }
 const s_name = t => ui.state.teams[t].name;
 /* Swap the plain log line for the play-by-play sentence. */
@@ -914,7 +1108,19 @@ function afterPlay(ev){
   ui.busy = false; autosave(); renderAll();
   requestAnimationFrame(()=>requestAnimationFrame(()=>$('#field').classList.remove('snap')));
   const el = $('#result'); el.classList.add('pop');
-  if(ui.state.over){ setTimeout(showOver, reducedMotion()?50:900); return; }
+  // A run scored: that inning's cell and the team total flash.
+  if(ui.scored && !reducedMotion()){
+    const row = $$('#score tbody tr')[ui.scored.t];
+    if(row){ const cells = row.querySelectorAll('td'); [cells[ui.scored.inn], cells[cells.length-2]].forEach(c=>c && c.classList.add('bump')); }
+  }
+  ui.scored = null;
+  if(ui.state.over){
+    const s = ui.state;
+    if(s.walkoff){ walkoffParty(s.winner); setTimeout(showOver, reducedMotion() ? 50 : 2700); }
+    else { stamp('FINAL', {ms:1400}); setTimeout(showOver, reducedMotion() ? 50 : 1500); }
+    return;
+  }
+  if(ev && ev.halfEnded) showSides();
   scheduleBot();
 }
 function onRoll(){
@@ -935,7 +1141,7 @@ function scheduleBot(){
 function undo(){
   if(ui.busy || ui.held || !ui.hist.length) return;
   clearBot();
-  ui.state = JSON.parse(ui.hist.pop()); ui.result = null; ui.labels = null;
+  ui.state = JSON.parse(ui.hist.pop()); ui.result = null; ui.labels = null; ui.battleWin = null;
   autosave(); renderAll(); toast('Last roll undone.'); scheduleBot();
 }
 
@@ -984,6 +1190,7 @@ function startGame(cfg){
   clearBot(); ui.state = newGame(cfg); ui.hist = []; ui.result = null; ui.labels = null; ui.busy = false;
   $('#app').hidden = false; autosave(); renderAll();
   logLine(ui.state, `Play ball! ${ui.state.teams[0].name} visit ${ui.state.teams[1].name}.`); renderLog();
+  if(!reducedMotion()) setTimeout(()=>{ stamp('PLAY BALL!', {color:'#F3D23B', ms:1500}); sfx.play('cheer'); }, 300);
   scheduleBot();
 }
 function showStart(){
@@ -1055,6 +1262,7 @@ function showMenu(){
 }
 
 /* ---------- Controls ---------- */
+$('#sides').addEventListener('close', ()=>{ clearTimeout(ui.sidesTimer); setTimeout(flashInning, 50); });
 $('#rollbtn').addEventListener('click', onRoll);
 $('#undo').addEventListener('click', undo);
 $('#gear').addEventListener('click', showMenu);
